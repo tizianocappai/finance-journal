@@ -36,7 +36,7 @@ _MESI = [
     "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
     "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
 ]
-_COLS = ["Data", "Tipo", "Importo", "Categoria", "Metodo di pagamento", "Nota", ""]
+_COLS = ["Data", "Tipo", "Importo", "Categoria", "Dettaglio", "Metodo di pagamento", "Nota", ""]
 
 
 class MovimentiWidget(QWidget):
@@ -55,6 +55,7 @@ class MovimentiWidget(QWidget):
         self._dettagli: list[Dettaglio] = []
         self._categorie_map: dict[int, str] = {}
         self._metodi_map: dict[int, str] = {}
+        self._dettagli_map: dict[int, str] = {}
         self._movimenti_list: list[Movimento] = []
         self._build_ui()
         self._load_table()
@@ -111,6 +112,7 @@ class MovimentiWidget(QWidget):
             self._metodi_map[m.id] = m.nome
         self._met_filter.currentIndexChanged.connect(self._load_table)
         self._dettagli = self._repo_det.list()
+        self._dettagli_map = {d.id: d.nome for d in self._dettagli if d.id is not None}
         filter_row.addWidget(self._met_filter)
 
         self._search_edit = QLineEdit()
@@ -154,6 +156,7 @@ class MovimentiWidget(QWidget):
         self._dettagli = self._repo_det.list()
         self._categorie_map = {c.id: c.nome for c in self._categorie}
         self._metodi_map = {m.id: m.nome for m in self._metodi}
+        self._dettagli_map = {d.id: d.nome for d in self._dettagli if d.id is not None}
 
         prev_anno = self._anno_combo.currentData()
         self._anno_combo.blockSignals(True)
@@ -212,9 +215,11 @@ class MovimentiWidget(QWidget):
             self._table.setItem(row, 2, QTableWidgetItem(f"{valuta} {m.importo:,.2f}"))
             cat_nome = self._categorie_map.get(m.categoria_id, "—")
             self._table.setItem(row, 3, QTableWidgetItem(cat_nome))
+            det_nome = self._dettagli_map.get(m.dettaglio_id, "—") if m.dettaglio_id else "—"
+            self._table.setItem(row, 4, QTableWidgetItem(det_nome))
             met_nome = self._metodi_map.get(m.metodo_id, "—")
-            self._table.setItem(row, 4, QTableWidgetItem(met_nome))
-            self._table.setItem(row, 5, QTableWidgetItem(m.nota or ""))
+            self._table.setItem(row, 5, QTableWidgetItem(met_nome))
+            self._table.setItem(row, 6, QTableWidgetItem(m.nota or ""))
 
             cell = QWidget()
             lay = QHBoxLayout(cell)
