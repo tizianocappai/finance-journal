@@ -24,6 +24,19 @@ class DettaglioRepository:
         self._conn.commit()
         return Dettaglio(id=cur.lastrowid, nome=nome, categoria_id=categoria_id, predefinita=False)
 
+    def count_in_uso(self, dettaglio_id: int) -> int:
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM movimenti WHERE dettaglio_id = ?", (dettaglio_id,)
+        ).fetchone()
+        return row[0]
+
+    def update_categoria(self, dettaglio_id: int, categoria_id: int) -> None:
+        self._conn.execute(
+            "UPDATE dettagli SET categoria_id = ? WHERE id = ?",
+            (categoria_id, dettaglio_id),
+        )
+        self._conn.commit()
+
     def delete(self, dettaglio_id: int) -> None:
         row = self._conn.execute(
             "SELECT predefinita FROM dettagli WHERE id = ?", (dettaglio_id,)

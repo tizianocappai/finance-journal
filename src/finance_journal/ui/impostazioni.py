@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
     QDateEdit,
+    QDialog,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -17,6 +18,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
+    QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -29,8 +31,10 @@ from PyQt6.QtWidgets import (
 
 from finance_journal.db.connection import get_db_path
 from finance_journal.models.categoria import Categoria
+from finance_journal.models.dettaglio import Dettaglio
 from finance_journal.models.metodo_pagamento import MetodoPagamento
 from finance_journal.repositories.categoria import CategoriaRepository
+from finance_journal.repositories.dettaglio import DettaglioRepository
 from finance_journal.repositories.impostazioni import ImpostazioniRepository
 from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
 
@@ -69,6 +73,7 @@ class ImpostazioniWidget(QWidget):
         self._repo = ImpostazioniRepository(conn)
         self._repo_cat = CategoriaRepository(conn)
         self._repo_met = MetodoPagamentoRepository(conn)
+        self._repo_det = DettaglioRepository(conn)
         self._build_ui()
         self._load()
 
@@ -191,6 +196,26 @@ class ImpostazioniWidget(QWidget):
         vbox_met.addLayout(btn_met_row)
         root.addWidget(grp_met)
 
+        # --- Dettagli ---
+        grp_det = QGroupBox("Dettagli")
+        vbox_det = QVBoxLayout(grp_det)
+        self._det_list = QListWidget()
+        self._det_list.currentItemChanged.connect(self._on_det_selection_changed)
+        vbox_det.addWidget(self._det_list)
+        btn_det_row = QHBoxLayout()
+        btn_add_det = QPushButton("+")
+        btn_add_det.setFixedWidth(32)
+        btn_add_det.clicked.connect(self._on_add_det)
+        self._btn_remove_det = QPushButton("−")
+        self._btn_remove_det.setFixedWidth(32)
+        self._btn_remove_det.setEnabled(False)
+        self._btn_remove_det.clicked.connect(self._on_remove_det)
+        btn_det_row.addWidget(btn_add_det)
+        btn_det_row.addWidget(self._btn_remove_det)
+        btn_det_row.addStretch()
+        vbox_det.addLayout(btn_det_row)
+        root.addWidget(grp_det)
+
         root.addStretch()
 
     def _load(self) -> None:
@@ -211,6 +236,7 @@ class ImpostazioniWidget(QWidget):
         _applica_tema_app(tema)
         self._load_categorie()
         self._load_metodi()
+        self._load_dettagli()
 
     def _salva_valuta(self) -> None:
         simbolo = self._simbolo_edit.text().strip() or "€"
@@ -257,6 +283,41 @@ class ImpostazioniWidget(QWidget):
             self._met_list.addItem(item)
         self._btn_remove_met.setEnabled(False)
 
+    def _load_dettagli(self) -> None:
+        self._det_list.clear()
+        categorie = self._repo_cat.list()
+        for det in self._repo_det.list():
+            item = QListWidgetItem()
+            item.setData(Qt.ItemDataRole.UserRole, det)
+
+            row_widget = QWidget()
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(4, 2, 4, 2)
+            row_layout.setSpacing(8)
+
+            nome_lbl = QLabel(det.nome)
+            arrow_lbl = QLabel("→")
+            cat_combo = QComboBox()
+            for c in categorie:
+                cat_combo.addItem(c.nome, c.id)
+            idx = cat_combo.findData(det.categoria_id)
+            if idx >= 0:
+                cat_combo.setCurrentIndex(idx)
+            cat_combo.currentIndexChanged.connect(
+                lambda _index, d=det, cb=cat_combo: self._on_det_cat_changed(d.id, cb)
+            )
+
+            row_layout.addWidget(nome_lbl)
+            row_layout.addWidget(arrow_lbl)
+            row_layout.addWidget(cat_combo)
+            row_layout.addStretch()
+
+            item.setSizeHint(row_widget.sizeHint())
+            self._det_list.addItem(item)
+            self._det_list.setItemWidget(item, row_widget)
+
+        self._btn_remove_det.setEnabled(False)
+
     def _on_cat_selection_changed(self) -> None:
         item = self._cat_list.currentItem()
         if item is None:
@@ -272,6 +333,30 @@ class ImpostazioniWidget(QWidget):
             return
         met: MetodoPagamento = item.data(Qt.ItemDataRole.UserRole)
         self._btn_remove_met.setEnabled(not met.predefinito)
+
+    def _on_det_selection_changed(self) -> None:
+        item = self._det_list.currentItem()
+        if item is None:
+            self._btn_remove_det.setEnabled(False)
+            return
+        det: Dettaglio = item.data(Qt.ItemDataRole.UserRole)
+        self._btn_remove_det.setEnabled(not det.predefinita)
+
+    def _on_det_cat_changed(self, dettaglio_id: int, combo: QComboBox) -> None:
+        cat_id = combo.currentData()
+        if cat_id is None:
+            return
+        self._repo_det.update_categoria(dettaglio_id, cat_id)
+        # Keep UserRole in sync so _on_det_selection_changed reads fresh data
+        for i in range(self._det_list.count()):
+            item = self._det_list.item(i)
+            det: Dettaglio = item.data(Qt.ItemDataRole.UserRole)
+            if det.id == dettaglio_id:
+                item.setData(
+                    Qt.ItemDataRole.UserRole,
+                    Dettaglio(id=det.id, nome=det.nome, categoria_id=cat_id, predefinita=det.predefinita),
+                )
+                break
 
     def _on_add_cat(self) -> None:
         nome, ok = QInputDialog.getText(self, "Nuova categoria", "Nome:")
@@ -344,6 +429,73 @@ class ImpostazioniWidget(QWidget):
             QMessageBox.warning(self, "Errore", str(e))
             return
         self._load_metodi()
+
+    def _on_add_det(self) -> None:
+        categorie = self._repo_cat.list()
+        if not categorie:
+            QMessageBox.warning(self, "Errore", "Nessuna categoria disponibile.")
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Nuovo dettaglio")
+        form = QFormLayout(dlg)
+
+        nome_edit = QLineEdit()
+        form.addRow("Nome:", nome_edit)
+
+        cat_combo = QComboBox()
+        for c in categorie:
+            cat_combo.addItem(c.nome, c.id)
+        form.addRow("Categoria:", cat_combo)
+
+        btn_row = QHBoxLayout()
+        btn_ok = QPushButton("OK")
+        btn_cancel = QPushButton("Annulla")
+        btn_ok.clicked.connect(dlg.accept)
+        btn_cancel.clicked.connect(dlg.reject)
+        btn_row.addWidget(btn_ok)
+        btn_row.addWidget(btn_cancel)
+        form.addRow("", btn_row)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        nome = nome_edit.text().strip()
+        if not nome:
+            return
+        cat_id = cat_combo.currentData()
+        try:
+            self._repo_det.create(nome, cat_id)
+        except Exception as e:
+            QMessageBox.warning(self, "Errore", str(e))
+            return
+        self._load_dettagli()
+
+    def _on_remove_det(self) -> None:
+        item = self._det_list.currentItem()
+        if item is None:
+            return
+        det: Dettaglio = item.data(Qt.ItemDataRole.UserRole)
+        if det.predefinita:
+            return
+        count = self._repo_det.count_in_uso(det.id)
+        if count > 0:
+            risposta = QMessageBox.question(
+                self,
+                "Conferma eliminazione",
+                f"Questo dettaglio è usato da {count} "
+                f"moviment{'o' if count == 1 else 'i'}.\n"
+                "Verranno rimossi dal dettaglio ma manterranno la loro Categoria. Continuare?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if risposta != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            self._repo_det.delete(det.id)
+        except ValueError as e:
+            QMessageBox.warning(self, "Errore", str(e))
+            return
+        self._load_dettagli()
 
     def _esporta_db(self) -> None:
         src = get_db_path()
