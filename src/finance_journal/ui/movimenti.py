@@ -7,8 +7,10 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -33,7 +35,7 @@ _MESI = [
     "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
     "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
 ]
-_COLS = ["Data", "Tipo", "Importo", "Categoria", "Metodo di pagamento", "Nota"]
+_COLS = ["Data", "Tipo", "Importo", "Categoria", "Metodo di pagamento", "Nota", ""]
 
 
 class MovimentiWidget(QWidget):
@@ -117,9 +119,11 @@ class MovimentiWidget(QWidget):
         self._table.setHorizontalHeaderLabels(_COLS)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._table.horizontalHeader().setStretchLastSection(True)
+        header = self._table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(len(_COLS) - 2, QHeaderView.ResizeMode.Stretch)
+        self._table.setColumnWidth(len(_COLS) - 1, 170)
         self._table.verticalHeader().setVisible(False)
-        self._table.cellDoubleClicked.connect(self._on_edit)
         root.addWidget(self._table)
 
         btn_row = QHBoxLayout()
@@ -190,6 +194,19 @@ class MovimentiWidget(QWidget):
             self._table.setItem(row, 4, QTableWidgetItem(met_nome))
             self._table.setItem(row, 5, QTableWidgetItem(m.nota or ""))
 
+            cell = QWidget()
+            lay = QHBoxLayout(cell)
+            lay.setContentsMargins(2, 2, 2, 2)
+            lay.setSpacing(4)
+            btn_mod = QPushButton("Modifica")
+            btn_mod.clicked.connect(lambda checked=False, r=row: self._on_modifica(r))
+            btn_del = QPushButton("Elimina")
+            btn_del.setStyleSheet("color: #c62828;")
+            btn_del.clicked.connect(lambda checked=False, r=row: self._on_elimina_riga(r))
+            lay.addWidget(btn_mod)
+            lay.addWidget(btn_del)
+            self._table.setCellWidget(row, len(_COLS) - 1, cell)
+
     def _refresh(self) -> None:
         self._reload_lookups()
         self._load_table()
@@ -214,7 +231,7 @@ class MovimentiWidget(QWidget):
             )
             self._refresh()
 
-    def _on_edit(self, row: int, _col: int) -> None:
+    def _on_modifica(self, row: int) -> None:
         if row < 0 or row >= len(self._movimenti_list):
             return
         movimento = self._movimenti_list[row]
@@ -225,17 +242,29 @@ class MovimentiWidget(QWidget):
         )
         if dialog.exec() != MovimentoDialog.DialogCode.Accepted:
             return
-        if dialog.is_deleted():
-            self._repo_mov.delete_movimento(movimento.id)
-        else:
-            d = dialog.get_data()
-            self._repo_mov.update_movimento(
-                movimento.id,
-                data=d["data"],
-                tipo=d["tipo"],
-                importo=d["importo"],
-                categoria_id=d["categoria_id"],
-                metodo_id=d["metodo_id"],
-                nota=d["nota"],
-            )
+        d = dialog.get_data()
+        self._repo_mov.update_movimento(
+            movimento.id,
+            data=d["data"],
+            tipo=d["tipo"],
+            importo=d["importo"],
+            categoria_id=d["categoria_id"],
+            metodo_id=d["metodo_id"],
+            nota=d["nota"],
+        )
         self._refresh()
+
+    def _on_elimina_riga(self, row: int) -> None:
+        if row < 0 or row >= len(self._movimenti_list):
+            return
+        movimento = self._movimenti_list[row]
+        risposta = QMessageBox.question(
+            self,
+            "Conferma eliminazione",
+            "Sei sicuro di voler eliminare questo Movimento?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if risposta == QMessageBox.StandardButton.Yes:
+            self._repo_mov.delete_movimento(movimento.id)
+            self._refresh()

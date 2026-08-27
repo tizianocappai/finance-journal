@@ -13,8 +13,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLineEdit,
-    QMessageBox,
-    QPushButton,
     QRadioButton,
     QWidget,
 )
@@ -40,8 +38,6 @@ class MovimentoDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._movimento = movimento
-        self._deleted = False
         self._cat_repo = cat_repo
         self._met_repo = met_repo
         edit_mode = movimento is not None
@@ -121,13 +117,6 @@ class MovimentoDialog(QDialog):
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-
-        if edit_mode:
-            btn_elimina = QPushButton("Elimina")
-            btn_elimina.setStyleSheet("color: #c62828;")
-            btn_elimina.clicked.connect(self._on_elimina)
-            buttons.addButton(btn_elimina, QDialogButtonBox.ButtonRole.DestructiveRole)
-
         form.addRow(buttons)
 
     def _on_cat_idx_changed(self, idx: int) -> None:
@@ -161,21 +150,6 @@ class MovimentoDialog(QDialog):
         sentinel_idx = self._met_combo.count() - 1
         self._met_combo.insertItem(sentinel_idx, met.nome, met.id)
         self._met_combo.setCurrentIndex(sentinel_idx)
-
-    def _on_elimina(self) -> None:
-        risposta = QMessageBox.question(
-            self,
-            "Conferma eliminazione",
-            "Sei sicuro di voler eliminare questo Movimento?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if risposta == QMessageBox.StandardButton.Yes:
-            self._deleted = True
-            self.accept()
-
-    def is_deleted(self) -> bool:
-        return self._deleted
 
     def get_data(self) -> dict:
         qdate = self._data_edit.date()
