@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QWidget
 
+from finance_journal.db.connection import create_connection
+from finance_journal.ui.dashboard import DashboardWidget
+from finance_journal.ui.movimenti import MovimentiWidget
 from finance_journal.ui.placeholder import PlaceholderWidget
 from finance_journal.ui.sidebar import Sidebar
 
@@ -9,6 +14,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Finance Journal")
         self.setMinimumSize(900, 600)
+
+        self._conn = create_connection()
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -21,16 +28,38 @@ class MainWindow(QMainWindow):
         self._sidebar.section_changed.connect(self._on_section_changed)
         layout.addWidget(self._sidebar)
 
-        # Default view
-        self._content = PlaceholderWidget("Dashboard")
-        layout.addWidget(self._content, stretch=1)
+        self._dashboard = DashboardWidget(self._conn)
+        self._movimenti = MovimentiWidget(self._conn)
+        self._movimenti.movimento_aggiunto.connect(self._dashboard.refresh)
+
+        self._named_views: dict[str, QWidget] = {
+            "Dashboard": self._dashboard,
+            "Movimenti": self._movimenti,
+        }
+        for v in self._named_views.values():
+            v.hide()
+
+        self._current: QWidget = self._dashboard
+        self._dashboard.show()
+        layout.addWidget(self._dashboard, stretch=1)
 
     def _on_section_changed(self, section: str) -> None:
         layout = self.centralWidget().layout()
-        # Remove old content widget (index 1)
-        old = layout.takeAt(1)
-        if old and old.widget():
-            old.widget().deleteLater()
-        new_widget = PlaceholderWidget(section)
+        layout.removeWidget(self._current)
+        old = self._current
+        if old not in self._named_views.values():
+            old.deleteLater()
+        else:
+            old.hide()
+
+        if section in self._named_views:
+            new_widget: QWidget = self._named_views[section]
+        else:
+            new_widget = PlaceholderWidget(section)
+
+        if hasattr(new_widget, "refresh"):
+            new_widget.refresh()  # type: ignore[union-attr]
+
+        new_widget.show()
         layout.addWidget(new_widget, stretch=1)
-        self._content = new_widget
+        self._current = new_widget
