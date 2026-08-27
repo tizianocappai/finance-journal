@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import date
 
 
 class ImpostazioniRepository:
@@ -18,3 +19,20 @@ class ImpostazioniRepository:
             (chiave, valore),
         )
         self._conn.commit()
+
+    def get_saldo_iniziale(self) -> tuple[float, date | None]:
+        importo = 0.0
+        importo_str = self.get("saldo_iniziale_importo")
+        if importo_str:
+            try:
+                importo = float(importo_str)
+            except ValueError:
+                pass
+        saldo_data: date | None = None
+        data_str = self.get("saldo_iniziale_data")
+        if data_str:
+            try:
+                saldo_data = date.fromisoformat(data_str)
+            except ValueError:
+                pass
+        return importo, saldo_data

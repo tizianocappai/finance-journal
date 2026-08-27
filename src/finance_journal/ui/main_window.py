@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QWidget
 
 from finance_journal.db.connection import create_connection
 from finance_journal.ui.dashboard import DashboardWidget
+from finance_journal.ui.impostazioni import ImpostazioniWidget
 from finance_journal.ui.movimenti import MovimentiWidget
 from finance_journal.ui.placeholder import PlaceholderWidget
 from finance_journal.ui.sidebar import Sidebar
@@ -30,11 +31,16 @@ class MainWindow(QMainWindow):
 
         self._dashboard = DashboardWidget(self._conn)
         self._movimenti = MovimentiWidget(self._conn)
+        self._impostazioni = ImpostazioniWidget(self._conn)
+
         self._movimenti.dati_modificati.connect(self._dashboard.refresh)
+        self._impostazioni.impostazioni_cambiate.connect(self._dashboard.refresh)
+        self._impostazioni.impostazioni_cambiate.connect(self._movimenti.refresh)
 
         self._named_views: dict[str, QWidget] = {
             "Dashboard": self._dashboard,
             "Movimenti": self._movimenti,
+            "Impostazioni": self._impostazioni,
         }
         for v in self._named_views.values():
             v.hide()

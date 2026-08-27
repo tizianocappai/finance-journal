@@ -130,7 +130,9 @@ class DashboardWidget(QWidget):
         categorie = {c.id: c.nome for c in self._repo_cat.list()}
         valuta = self._repo_imp.get("valuta", "€") or "€"
 
-        kpi = kpi_annuali(movimenti, self._anno)
+        saldo_iniziale, saldo_iniziale_data = self._repo_imp.get_saldo_iniziale()
+
+        kpi = kpi_annuali(movimenti, self._anno, saldo_iniziale, saldo_iniziale_data)
         self._kpi_entrate.set_value(f"{valuta} {kpi['entrate']:,.2f}")
         self._kpi_uscite.set_value(f"{valuta} {kpi['uscite']:,.2f}")
         self._kpi_saldo.set_value(f"{valuta} {kpi['saldo']:,.2f}")
