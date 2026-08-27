@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, 
 
 from finance_journal.db.connection import create_connection
 from finance_journal.export import export_csv, export_json
+from finance_journal.ui.import_dialogs import run_import_csv_flow
 from finance_journal.ui.dashboard import DashboardWidget
 from finance_journal.ui.impostazioni import ImpostazioniWidget
 from finance_journal.ui.movimenti import MovimentiWidget
@@ -23,6 +24,9 @@ class MainWindow(QMainWindow):
 
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
+        act_importa = file_menu.addAction("Importa CSV…")
+        act_importa.triggered.connect(self._importa_csv)
+        file_menu.addSeparator()
         act_csv = file_menu.addAction("Esporta come CSV…")
         act_csv.triggered.connect(self._esporta_csv)
         act_json = file_menu.addAction("Esporta come JSON…")
@@ -58,6 +62,11 @@ class MainWindow(QMainWindow):
         self._current: QWidget = self._dashboard
         self._dashboard.show()
         layout.addWidget(self._dashboard, stretch=1)
+
+    def _importa_csv(self) -> None:
+        if run_import_csv_flow(self._conn, self):
+            self._movimenti.refresh()
+            self._dashboard.refresh()
 
     def _esporta_csv(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
