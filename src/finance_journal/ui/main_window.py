@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QWidget
+from pathlib import Path
+
+from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QWidget
 
 from finance_journal.db.connection import create_connection
+from finance_journal.export import export_csv, export_json
 from finance_journal.ui.dashboard import DashboardWidget
 from finance_journal.ui.impostazioni import ImpostazioniWidget
 from finance_journal.ui.movimenti import MovimentiWidget
@@ -17,6 +20,13 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(900, 600)
 
         self._conn = create_connection()
+
+        menu_bar = self.menuBar()
+        file_menu = menu_bar.addMenu("File")
+        act_csv = file_menu.addAction("Esporta come CSV…")
+        act_csv.triggered.connect(self._esporta_csv)
+        act_json = file_menu.addAction("Esporta come JSON…")
+        act_json.triggered.connect(self._esporta_json)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -48,6 +58,24 @@ class MainWindow(QMainWindow):
         self._current: QWidget = self._dashboard
         self._dashboard.show()
         layout.addWidget(self._dashboard, stretch=1)
+
+    def _esporta_csv(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Esporta come CSV", str(Path.home() / "movimenti.csv"), "CSV (*.csv)"
+        )
+        if not path:
+            return
+        export_csv(self._conn, Path(path))
+        QMessageBox.information(self, "Export completato", f"File salvato in:\n{path}")
+
+    def _esporta_json(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Esporta come JSON", str(Path.home() / "movimenti.json"), "JSON (*.json)"
+        )
+        if not path:
+            return
+        export_json(self._conn, Path(path))
+        QMessageBox.information(self, "Export completato", f"File salvato in:\n{path}")
 
     def _on_section_changed(self, section: str) -> None:
         layout = self.centralWidget().layout()
