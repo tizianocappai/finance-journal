@@ -1,5 +1,16 @@
+import sys
+
+from PyQt6.QtWidgets import QApplication
+
+from finance_journal.ui.main_window import MainWindow
+
+
 def main() -> None:
-    raise NotImplementedError("UI not implemented yet (T03)")
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
