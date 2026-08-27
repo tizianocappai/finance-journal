@@ -85,6 +85,50 @@ class MovimentoRepository:
         self._conn.execute("DELETE FROM movimenti WHERE id = ?", (movimento_id,))
         self._conn.commit()
 
+    def delete_all(
+        self,
+        sezione: str = "personale",
+        anno: int | None = None,
+        mese: int | None = None,
+        tipo: str | None = None,
+        categoria_id: int | None = None,
+        metodo_id: int | None = None,
+        testo: str | None = None,
+    ) -> None:
+        clauses = ["sezione = ?"]
+        params: list = [sezione]
+
+        if anno is not None:
+            clauses.append("strftime('%Y', data) = ?")
+            params.append(str(anno))
+        if mese is not None:
+            clauses.append("strftime('%m', data) = ?")
+            params.append(f"{mese:02d}")
+        if tipo is not None:
+            clauses.append("tipo = ?")
+            params.append(tipo)
+        if categoria_id is not None:
+            clauses.append("categoria_id = ?")
+            params.append(categoria_id)
+        if metodo_id is not None:
+            clauses.append("metodo_id = ?")
+            params.append(metodo_id)
+        if testo is not None and testo.strip():
+            clauses.append("nota LIKE ?")
+            params.append(f"%{testo}%")
+
+        where = " AND ".join(clauses)
+        self._conn.execute(f"DELETE FROM movimenti WHERE {where}", params)
+        self._conn.commit()
+
+    def list_anni(self, sezione: str = "personale") -> list[int]:
+        rows = self._conn.execute(
+            "SELECT DISTINCT CAST(strftime('%Y', data) AS INTEGER) AS anno"
+            " FROM movimenti WHERE sezione = ? ORDER BY anno DESC",
+            (sezione,),
+        ).fetchall()
+        return [r["anno"] for r in rows]
+
     def _fetch_by_id(self, movimento_id: int) -> Movimento:
         row = self._conn.execute(
             "SELECT * FROM movimenti WHERE id = ?", (movimento_id,)

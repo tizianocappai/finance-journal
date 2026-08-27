@@ -168,6 +168,89 @@ def test_delete_rimuove_solo_il_movimento_specificato(repo, conn):
     assert rimasti[0].id == m2.id
 
 
+# --- Delete All ---
+
+def test_delete_all_senza_filtri_svuota_sezione(repo, conn):
+    _crea(repo, conn)
+    _crea(repo, conn)
+    repo.delete_all(sezione="personale")
+    assert repo.list(sezione="personale") == []
+
+
+def test_delete_all_filtro_anno(repo, conn):
+    _crea(repo, conn, data=date(2024, 6, 1))
+    _crea(repo, conn, data=date(2025, 6, 1))
+    repo.delete_all(sezione="personale", anno=2025)
+    rimasti = repo.list(sezione="personale")
+    assert len(rimasti) == 1
+    assert rimasti[0].data.year == 2024
+
+
+def test_delete_all_filtro_mese(repo, conn):
+    _crea(repo, conn, data=date(2025, 3, 1))
+    _crea(repo, conn, data=date(2025, 4, 1))
+    repo.delete_all(sezione="personale", anno=2025, mese=3)
+    rimasti = repo.list(sezione="personale")
+    assert len(rimasti) == 1
+    assert rimasti[0].data.month == 4
+
+
+def test_delete_all_filtro_mese_standalone(repo, conn):
+    _crea(repo, conn, data=date(2024, 3, 1))
+    _crea(repo, conn, data=date(2025, 3, 1))
+    _crea(repo, conn, data=date(2025, 4, 1))
+    repo.delete_all(sezione="personale", mese=3)
+    rimasti = repo.list(sezione="personale")
+    assert len(rimasti) == 1
+    assert rimasti[0].data.month == 4
+
+
+def test_delete_all_filtro_tipo(repo, conn):
+    _crea(repo, conn, tipo="entrata")
+    _crea(repo, conn, tipo="uscita")
+    repo.delete_all(sezione="personale", tipo="uscita")
+    rimasti = repo.list(sezione="personale")
+    assert len(rimasti) == 1
+    assert rimasti[0].tipo == "entrata"
+
+
+def test_delete_all_filtro_combinato(repo, conn):
+    _crea(repo, conn, data=date(2025, 3, 1), tipo="uscita")
+    _crea(repo, conn, data=date(2025, 3, 1), tipo="entrata")
+    _crea(repo, conn, data=date(2025, 4, 1), tipo="uscita")
+    repo.delete_all(sezione="personale", anno=2025, mese=3, tipo="uscita")
+    rimasti = repo.list(sezione="personale")
+    assert len(rimasti) == 2
+
+
+def test_delete_all_isolamento_sezioni(repo, conn):
+    _crea(repo, conn, sezione="personale")
+    _crea(repo, conn, sezione="casa")
+    repo.delete_all(sezione="personale")
+    assert repo.list(sezione="personale") == []
+    assert len(repo.list(sezione="casa")) == 1
+
+
+# --- List Anni ---
+
+def test_list_anni_ritorna_anni_distinti_in_ordine_desc(repo, conn):
+    _crea(repo, conn, data=date(2024, 1, 1))
+    _crea(repo, conn, data=date(2025, 6, 1))
+    _crea(repo, conn, data=date(2025, 12, 31))
+    anni = repo.list_anni(sezione="personale")
+    assert anni == [2025, 2024]
+
+
+def test_list_anni_isolamento_sezioni(repo, conn):
+    _crea(repo, conn, data=date(2023, 1, 1), sezione="personale")
+    _crea(repo, conn, data=date(2024, 1, 1), sezione="casa")
+    assert repo.list_anni(sezione="personale") == [2023]
+
+
+def test_list_anni_vuoto_se_nessun_movimento(repo, conn):
+    assert repo.list_anni(sezione="personale") == []
+
+
 # --- Dettaglio ---
 
 def _det_id(conn) -> int:

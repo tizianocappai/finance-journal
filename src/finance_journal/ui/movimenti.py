@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -70,18 +69,20 @@ class MovimentiWidget(QWidget):
 
         filter_row.addWidget(QLabel("Mese:"))
         self._mese_combo = QComboBox()
-        for nome in _MESI:
-            self._mese_combo.addItem(nome)
-        self._mese_combo.setCurrentIndex(date.today().month - 1)
+        self._mese_combo.addItem("Tutti i mesi", None)
+        for i, nome in enumerate(_MESI):
+            self._mese_combo.addItem(nome, i + 1)
+        self._mese_combo.setCurrentIndex(0)
         self._mese_combo.currentIndexChanged.connect(self._load_table)
         filter_row.addWidget(self._mese_combo)
 
         filter_row.addWidget(QLabel("Anno:"))
-        self._anno_spin = QSpinBox()
-        self._anno_spin.setRange(2000, 2100)
-        self._anno_spin.setValue(date.today().year)
-        self._anno_spin.valueChanged.connect(self._load_table)
-        filter_row.addWidget(self._anno_spin)
+        self._anno_combo = QComboBox()
+        self._anno_combo.addItem("Tutti gli anni", None)
+        for anno in self._repo_mov.list_anni(sezione=_SEZIONE):
+            self._anno_combo.addItem(str(anno), anno)
+        self._anno_combo.currentIndexChanged.connect(self._load_table)
+        filter_row.addWidget(self._anno_combo)
 
         filter_row.addWidget(QLabel("Tipo:"))
         self._tipo_combo = QComboBox()
@@ -132,6 +133,11 @@ class MovimentiWidget(QWidget):
         root.addWidget(self._table)
 
         btn_row = QHBoxLayout()
+        self._btn_elimina_tutti = QPushButton("Elimina movimenti mostrati")
+        self._btn_elimina_tutti.setStyleSheet("color: #c62828;")
+        self._btn_elimina_tutti.setEnabled(False)
+        self._btn_elimina_tutti.clicked.connect(self._on_elimina_tutti)
+        btn_row.addWidget(self._btn_elimina_tutti)
         btn_row.addStretch()
         self._btn_add = QPushButton("Aggiungi Movimento")
         self._btn_add.clicked.connect(self._on_add)
@@ -148,6 +154,16 @@ class MovimentiWidget(QWidget):
         self._dettagli = self._repo_det.list()
         self._categorie_map = {c.id: c.nome for c in self._categorie}
         self._metodi_map = {m.id: m.nome for m in self._metodi}
+
+        prev_anno = self._anno_combo.currentData()
+        self._anno_combo.blockSignals(True)
+        self._anno_combo.clear()
+        self._anno_combo.addItem("Tutti gli anni", None)
+        for anno in self._repo_mov.list_anni(sezione=_SEZIONE):
+            self._anno_combo.addItem(str(anno), anno)
+        idx = self._anno_combo.findData(prev_anno)
+        self._anno_combo.setCurrentIndex(max(0, idx))
+        self._anno_combo.blockSignals(False)
 
         prev_cat = self._cat_filter.currentData()
         self._cat_filter.blockSignals(True)
@@ -170,8 +186,8 @@ class MovimentiWidget(QWidget):
         self._met_filter.blockSignals(False)
 
     def _load_table(self) -> None:
-        mese = self._mese_combo.currentIndex() + 1
-        anno = self._anno_spin.value()
+        mese = self._mese_combo.currentData()
+        anno = self._anno_combo.currentData()
         tipo = self._tipo_combo.currentData()
         cat_id = self._cat_filter.currentData()
         met_id = self._met_filter.currentData()
@@ -212,6 +228,8 @@ class MovimentiWidget(QWidget):
             lay.addWidget(btn_mod)
             lay.addWidget(btn_del)
             self._table.setCellWidget(row, len(_COLS) - 1, cell)
+
+        self._btn_elimina_tutti.setEnabled(len(self._movimenti_list) > 0)
 
     def _refresh(self) -> None:
         self._reload_lookups()
@@ -263,6 +281,27 @@ class MovimentiWidget(QWidget):
             dettaglio_id=d["dettaglio_id"],
         )
         self._refresh()
+
+    def _on_elimina_tutti(self) -> None:
+        n = len(self._movimenti_list)
+        risposta = QMessageBox.question(
+            self,
+            "Conferma eliminazione",
+            f"Sei sicuro di voler eliminare {n} Moviment{'o' if n == 1 else 'i'}? L'operazione è irreversibile.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if risposta == QMessageBox.StandardButton.Yes:
+            self._repo_mov.delete_all(
+                sezione=_SEZIONE,
+                anno=self._anno_combo.currentData(),
+                mese=self._mese_combo.currentData(),
+                tipo=self._tipo_combo.currentData(),
+                categoria_id=self._cat_filter.currentData(),
+                metodo_id=self._met_filter.currentData(),
+                testo=self._search_edit.text().strip() or None,
+            )
+            self._refresh()
 
     def _on_elimina_riga(self, row: int) -> None:
         if row < 0 or row >= len(self._movimenti_list):
