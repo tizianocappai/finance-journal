@@ -20,10 +20,12 @@ from PyQt6.QtWidgets import (
 )
 
 from finance_journal.models.categoria import Categoria
+from finance_journal.models.dettaglio import Dettaglio
 from finance_journal.models.enums import TipoMovimento
 from finance_journal.models.metodo_pagamento import MetodoPagamento
 from finance_journal.models.movimento import Movimento
 from finance_journal.repositories.categoria import CategoriaRepository
+from finance_journal.repositories.dettaglio import DettaglioRepository
 from finance_journal.repositories.impostazioni import ImpostazioniRepository
 from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
 from finance_journal.repositories.movimento import MovimentoRepository
@@ -47,9 +49,11 @@ class MovimentiWidget(QWidget):
         self._repo_mov = MovimentoRepository(conn)
         self._repo_cat = CategoriaRepository(conn)
         self._repo_met = MetodoPagamentoRepository(conn)
+        self._repo_det = DettaglioRepository(conn)
         self._repo_imp = ImpostazioniRepository(conn)
         self._categorie: list[Categoria] = []
         self._metodi: list[MetodoPagamento] = []
+        self._dettagli: list[Dettaglio] = []
         self._categorie_map: dict[int, str] = {}
         self._metodi_map: dict[int, str] = {}
         self._movimenti_list: list[Movimento] = []
@@ -105,6 +109,7 @@ class MovimentiWidget(QWidget):
             self._met_filter.addItem(m.nome, m.id)
             self._metodi_map[m.id] = m.nome
         self._met_filter.currentIndexChanged.connect(self._load_table)
+        self._dettagli = self._repo_det.list()
         filter_row.addWidget(self._met_filter)
 
         self._search_edit = QLineEdit()
@@ -140,6 +145,7 @@ class MovimentiWidget(QWidget):
     def _reload_lookups(self) -> None:
         self._categorie = self._repo_cat.list()
         self._metodi = self._repo_met.list()
+        self._dettagli = self._repo_det.list()
         self._categorie_map = {c.id: c.nome for c in self._categorie}
         self._metodi_map = {m.id: m.nome for m in self._metodi}
 
@@ -215,6 +221,7 @@ class MovimentiWidget(QWidget):
     def _on_add(self) -> None:
         dialog = MovimentoDialog(
             self._categorie, self._metodi,
+            dettagli=self._dettagli,
             cat_repo=self._repo_cat, met_repo=self._repo_met,
             parent=self,
         )
@@ -228,6 +235,7 @@ class MovimentiWidget(QWidget):
                 metodo_id=d["metodo_id"],
                 sezione=_SEZIONE,
                 nota=d["nota"],
+                dettaglio_id=d["dettaglio_id"],
             )
             self._refresh()
 
@@ -237,6 +245,7 @@ class MovimentiWidget(QWidget):
         movimento = self._movimenti_list[row]
         dialog = MovimentoDialog(
             self._categorie, self._metodi,
+            dettagli=self._dettagli,
             cat_repo=self._repo_cat, met_repo=self._repo_met,
             movimento=movimento, parent=self,
         )
@@ -251,6 +260,7 @@ class MovimentiWidget(QWidget):
             categoria_id=d["categoria_id"],
             metodo_id=d["metodo_id"],
             nota=d["nota"],
+            dettaglio_id=d["dettaglio_id"],
         )
         self._refresh()
 
