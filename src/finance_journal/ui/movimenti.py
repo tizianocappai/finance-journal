@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from finance_journal.models.categoria import Categoria
 from finance_journal.models.enums import TipoMovimento
 from finance_journal.models.metodo_pagamento import MetodoPagamento
+from finance_journal.models.movimento import Movimento
 from finance_journal.repositories.categoria import CategoriaRepository
 from finance_journal.repositories.impostazioni import ImpostazioniRepository
 from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
@@ -36,7 +37,7 @@ _COLS = ["Data", "Tipo", "Importo", "Categoria", "Metodo di pagamento", "Nota"]
 
 
 class MovimentiWidget(QWidget):
-    movimento_aggiunto = pyqtSignal()
+    dati_modificati = pyqtSignal()
 
     def __init__(self, conn: sqlite3.Connection, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -49,6 +50,7 @@ class MovimentiWidget(QWidget):
         self._metodi: list[MetodoPagamento] = []
         self._categorie_map: dict[int, str] = {}
         self._metodi_map: dict[int, str] = {}
+        self._movimenti_list: list[Movimento] = []
         self._build_ui()
         self._load_table()
 
@@ -117,6 +119,7 @@ class MovimentiWidget(QWidget):
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.verticalHeader().setVisible(False)
+        self._table.cellDoubleClicked.connect(self._on_edit)
         root.addWidget(self._table)
 
         btn_row = QHBoxLayout()
@@ -138,7 +141,7 @@ class MovimentiWidget(QWidget):
         testo = self._search_edit.text().strip() or None
 
         valuta = self._repo_imp.get("valuta", "€") or "€"
-        movimenti = self._repo_mov.list(
+        self._movimenti_list = self._repo_mov.list(
             sezione=_SEZIONE,
             anno=anno,
             mese=mese,
@@ -148,8 +151,8 @@ class MovimentiWidget(QWidget):
             testo=testo,
         )
 
-        self._table.setRowCount(len(movimenti))
-        for row, m in enumerate(movimenti):
+        self._table.setRowCount(len(self._movimenti_list))
+        for row, m in enumerate(self._movimenti_list):
             self._table.setItem(row, 0, QTableWidgetItem(m.data.isoformat()))
             tipo_label = "Entrata" if m.tipo == TipoMovimento.ENTRATA else "Uscita"
             self._table.setItem(row, 1, QTableWidgetItem(tipo_label))
@@ -159,6 +162,10 @@ class MovimentiWidget(QWidget):
             met_nome = self._metodi_map.get(m.metodo_id, "—")
             self._table.setItem(row, 4, QTableWidgetItem(met_nome))
             self._table.setItem(row, 5, QTableWidgetItem(m.nota or ""))
+
+    def _refresh(self) -> None:
+        self._load_table()
+        self.dati_modificati.emit()
 
     def _on_add(self) -> None:
         dialog = MovimentoDialog(self._categorie, self._metodi, parent=self)
@@ -173,5 +180,26 @@ class MovimentiWidget(QWidget):
                 sezione=_SEZIONE,
                 nota=d["nota"],
             )
-            self._load_table()
-            self.movimento_aggiunto.emit()
+            self._refresh()
+
+    def _on_edit(self, row: int, _col: int) -> None:
+        if row < 0 or row >= len(self._movimenti_list):
+            return
+        movimento = self._movimenti_list[row]
+        dialog = MovimentoDialog(self._categorie, self._metodi, movimento=movimento, parent=self)
+        if dialog.exec() != MovimentoDialog.DialogCode.Accepted:
+            return
+        if dialog.is_deleted():
+            self._repo_mov.delete_movimento(movimento.id)
+        else:
+            d = dialog.get_data()
+            self._repo_mov.update_movimento(
+                movimento.id,
+                data=d["data"],
+                tipo=d["tipo"],
+                importo=d["importo"],
+                categoria_id=d["categoria_id"],
+                metodo_id=d["metodo_id"],
+                nota=d["nota"],
+            )
+        self._refresh()

@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
 
         self._dashboard = DashboardWidget(self._conn)
         self._movimenti = MovimentiWidget(self._conn)
-        self._movimenti.movimento_aggiunto.connect(self._dashboard.refresh)
+        self._movimenti.dati_modificati.connect(self._dashboard.refresh)
 
         self._named_views: dict[str, QWidget] = {
             "Dashboard": self._dashboard,
