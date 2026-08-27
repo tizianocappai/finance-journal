@@ -21,6 +21,12 @@ class CategoriaRepository:
         self._conn.commit()
         return Categoria(id=cur.lastrowid, nome=nome, predefinita=False)
 
+    def count_in_uso(self, categoria_id: int) -> int:
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM movimenti WHERE categoria_id = ?", (categoria_id,)
+        ).fetchone()
+        return row[0]
+
     def delete(self, categoria_id: int) -> None:
         row = self._conn.execute(
             "SELECT predefinita FROM categorie WHERE id = ?", (categoria_id,)

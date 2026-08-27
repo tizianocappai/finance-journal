@@ -130,7 +130,34 @@ class MovimentiWidget(QWidget):
         root.addLayout(btn_row)
 
     def refresh(self) -> None:
+        self._reload_lookups()
         self._load_table()
+
+    def _reload_lookups(self) -> None:
+        self._categorie = self._repo_cat.list()
+        self._metodi = self._repo_met.list()
+        self._categorie_map = {c.id: c.nome for c in self._categorie}
+        self._metodi_map = {m.id: m.nome for m in self._metodi}
+
+        prev_cat = self._cat_filter.currentData()
+        self._cat_filter.blockSignals(True)
+        self._cat_filter.clear()
+        self._cat_filter.addItem("Tutte", None)
+        for c in self._categorie:
+            self._cat_filter.addItem(c.nome, c.id)
+        idx = self._cat_filter.findData(prev_cat)
+        self._cat_filter.setCurrentIndex(max(0, idx))
+        self._cat_filter.blockSignals(False)
+
+        prev_met = self._met_filter.currentData()
+        self._met_filter.blockSignals(True)
+        self._met_filter.clear()
+        self._met_filter.addItem("Tutti", None)
+        for m in self._metodi:
+            self._met_filter.addItem(m.nome, m.id)
+        idx = self._met_filter.findData(prev_met)
+        self._met_filter.setCurrentIndex(max(0, idx))
+        self._met_filter.blockSignals(False)
 
     def _load_table(self) -> None:
         mese = self._mese_combo.currentIndex() + 1
@@ -164,11 +191,16 @@ class MovimentiWidget(QWidget):
             self._table.setItem(row, 5, QTableWidgetItem(m.nota or ""))
 
     def _refresh(self) -> None:
+        self._reload_lookups()
         self._load_table()
         self.dati_modificati.emit()
 
     def _on_add(self) -> None:
-        dialog = MovimentoDialog(self._categorie, self._metodi, parent=self)
+        dialog = MovimentoDialog(
+            self._categorie, self._metodi,
+            cat_repo=self._repo_cat, met_repo=self._repo_met,
+            parent=self,
+        )
         if dialog.exec() == MovimentoDialog.DialogCode.Accepted:
             d = dialog.get_data()
             self._repo_mov.create_movimento(
@@ -186,7 +218,11 @@ class MovimentiWidget(QWidget):
         if row < 0 or row >= len(self._movimenti_list):
             return
         movimento = self._movimenti_list[row]
-        dialog = MovimentoDialog(self._categorie, self._metodi, movimento=movimento, parent=self)
+        dialog = MovimentoDialog(
+            self._categorie, self._metodi,
+            cat_repo=self._repo_cat, met_repo=self._repo_met,
+            movimento=movimento, parent=self,
+        )
         if dialog.exec() != MovimentoDialog.DialogCode.Accepted:
             return
         if dialog.is_deleted():

@@ -5,7 +5,7 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from PyQt6.QtCore import QDate, pyqtSignal
+from PyQt6.QtCore import QDate, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -16,7 +16,10 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -25,7 +28,11 @@ from PyQt6.QtWidgets import (
 )
 
 from finance_journal.db.connection import get_db_path
+from finance_journal.models.categoria import Categoria
+from finance_journal.models.metodo_pagamento import MetodoPagamento
+from finance_journal.repositories.categoria import CategoriaRepository
 from finance_journal.repositories.impostazioni import ImpostazioniRepository
+from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
 
 _TEMA_SCURO = """
 QWidget { background-color: #2b2b2b; color: #f0f0f0; }
@@ -60,6 +67,8 @@ class ImpostazioniWidget(QWidget):
         super().__init__(parent)
         self._conn = conn
         self._repo = ImpostazioniRepository(conn)
+        self._repo_cat = CategoriaRepository(conn)
+        self._repo_met = MetodoPagamentoRepository(conn)
         self._build_ui()
         self._load()
 
@@ -142,6 +151,46 @@ class ImpostazioniWidget(QWidget):
         form_db.addRow("", btn_import)
         root.addWidget(grp_db)
 
+        # --- Categorie ---
+        grp_cat = QGroupBox("Categorie")
+        vbox_cat = QVBoxLayout(grp_cat)
+        self._cat_list = QListWidget()
+        self._cat_list.currentItemChanged.connect(self._on_cat_selection_changed)
+        vbox_cat.addWidget(self._cat_list)
+        btn_cat_row = QHBoxLayout()
+        btn_add_cat = QPushButton("+")
+        btn_add_cat.setFixedWidth(32)
+        btn_add_cat.clicked.connect(self._on_add_cat)
+        self._btn_remove_cat = QPushButton("−")
+        self._btn_remove_cat.setFixedWidth(32)
+        self._btn_remove_cat.setEnabled(False)
+        self._btn_remove_cat.clicked.connect(self._on_remove_cat)
+        btn_cat_row.addWidget(btn_add_cat)
+        btn_cat_row.addWidget(self._btn_remove_cat)
+        btn_cat_row.addStretch()
+        vbox_cat.addLayout(btn_cat_row)
+        root.addWidget(grp_cat)
+
+        # --- Metodi di pagamento ---
+        grp_met = QGroupBox("Metodi di pagamento")
+        vbox_met = QVBoxLayout(grp_met)
+        self._met_list = QListWidget()
+        self._met_list.currentItemChanged.connect(self._on_met_selection_changed)
+        vbox_met.addWidget(self._met_list)
+        btn_met_row = QHBoxLayout()
+        btn_add_met = QPushButton("+")
+        btn_add_met.setFixedWidth(32)
+        btn_add_met.clicked.connect(self._on_add_met)
+        self._btn_remove_met = QPushButton("−")
+        self._btn_remove_met.setFixedWidth(32)
+        self._btn_remove_met.setEnabled(False)
+        self._btn_remove_met.clicked.connect(self._on_remove_met)
+        btn_met_row.addWidget(btn_add_met)
+        btn_met_row.addWidget(self._btn_remove_met)
+        btn_met_row.addStretch()
+        vbox_met.addLayout(btn_met_row)
+        root.addWidget(grp_met)
+
         root.addStretch()
 
     def _load(self) -> None:
@@ -160,6 +209,8 @@ class ImpostazioniWidget(QWidget):
             self._tema_combo.setCurrentIndex(idx)
             self._tema_combo.blockSignals(False)
         _applica_tema_app(tema)
+        self._load_categorie()
+        self._load_metodi()
 
     def _salva_valuta(self) -> None:
         simbolo = self._simbolo_edit.text().strip() or "€"
@@ -187,6 +238,112 @@ class ImpostazioniWidget(QWidget):
         tema = self._tema_combo.currentData()
         self._repo.set("tema", tema)
         _applica_tema_app(tema)
+
+    def _load_categorie(self) -> None:
+        self._cat_list.clear()
+        for c in self._repo_cat.list():
+            label = f"{c.nome}  [predefinita]" if c.predefinita else c.nome
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, c)
+            self._cat_list.addItem(item)
+        self._btn_remove_cat.setEnabled(False)
+
+    def _load_metodi(self) -> None:
+        self._met_list.clear()
+        for m in self._repo_met.list():
+            label = f"{m.nome}  [predefinito]" if m.predefinito else m.nome
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, m)
+            self._met_list.addItem(item)
+        self._btn_remove_met.setEnabled(False)
+
+    def _on_cat_selection_changed(self) -> None:
+        item = self._cat_list.currentItem()
+        if item is None:
+            self._btn_remove_cat.setEnabled(False)
+            return
+        cat: Categoria = item.data(Qt.ItemDataRole.UserRole)
+        self._btn_remove_cat.setEnabled(not cat.predefinita)
+
+    def _on_met_selection_changed(self) -> None:
+        item = self._met_list.currentItem()
+        if item is None:
+            self._btn_remove_met.setEnabled(False)
+            return
+        met: MetodoPagamento = item.data(Qt.ItemDataRole.UserRole)
+        self._btn_remove_met.setEnabled(not met.predefinito)
+
+    def _on_add_cat(self) -> None:
+        nome, ok = QInputDialog.getText(self, "Nuova categoria", "Nome:")
+        if not ok or not nome.strip():
+            return
+        try:
+            self._repo_cat.create(nome.strip())
+        except Exception as e:
+            QMessageBox.warning(self, "Errore", str(e))
+            return
+        self._load_categorie()
+
+    def _on_remove_cat(self) -> None:
+        item = self._cat_list.currentItem()
+        if item is None:
+            return
+        cat: Categoria = item.data(Qt.ItemDataRole.UserRole)
+        count = self._repo_cat.count_in_uso(cat.id)
+        if count > 0:
+            risposta = QMessageBox.question(
+                self,
+                "Conferma eliminazione",
+                f"Questa categoria è usata da {count} "
+                f"moviment{'o' if count == 1 else 'i'}.\n"
+                "Verranno riassegnati ad 'Altro'. Continuare?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if risposta != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            self._repo_cat.delete(cat.id)
+        except ValueError as e:
+            QMessageBox.warning(self, "Errore", str(e))
+            return
+        self._load_categorie()
+
+    def _on_add_met(self) -> None:
+        nome, ok = QInputDialog.getText(self, "Nuovo metodo di pagamento", "Nome:")
+        if not ok or not nome.strip():
+            return
+        try:
+            self._repo_met.create(nome.strip())
+        except Exception as e:
+            QMessageBox.warning(self, "Errore", str(e))
+            return
+        self._load_metodi()
+
+    def _on_remove_met(self) -> None:
+        item = self._met_list.currentItem()
+        if item is None:
+            return
+        met: MetodoPagamento = item.data(Qt.ItemDataRole.UserRole)
+        count = self._repo_met.count_in_uso(met.id)
+        if count > 0:
+            risposta = QMessageBox.question(
+                self,
+                "Conferma eliminazione",
+                f"Questo metodo è usato da {count} "
+                f"moviment{'o' if count == 1 else 'i'}.\n"
+                "Verranno riassegnati ad 'Altro'. Continuare?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if risposta != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            self._repo_met.delete(met.id)
+        except ValueError as e:
+            QMessageBox.warning(self, "Errore", str(e))
+            return
+        self._load_metodi()
 
     def _esporta_db(self) -> None:
         src = get_db_path()

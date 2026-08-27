@@ -24,6 +24,12 @@ class MetodoPagamentoRepository:
         self._conn.commit()
         return MetodoPagamento(id=cur.lastrowid, nome=nome, predefinito=False)
 
+    def count_in_uso(self, metodo_id: int) -> int:
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM movimenti WHERE metodo_id = ?", (metodo_id,)
+        ).fetchone()
+        return row[0]
+
     def delete(self, metodo_id: int) -> None:
         row = self._conn.execute(
             "SELECT predefinito FROM metodi_pagamento WHERE id = ?", (metodo_id,)
