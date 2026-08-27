@@ -166,3 +166,28 @@ def test_delete_rimuove_solo_il_movimento_specificato(repo, conn):
     rimasti = repo.list(sezione="personale")
     assert len(rimasti) == 1
     assert rimasti[0].id == m2.id
+
+
+# --- Dettaglio ---
+
+def _det_id(conn) -> int:
+    return conn.execute("SELECT id FROM dettagli LIMIT 1").fetchone()["id"]
+
+
+def test_create_con_dettaglio_id_none(repo, conn):
+    m = _crea(repo, conn)
+    assert m.dettaglio_id is None
+
+
+def test_create_con_dettaglio_id_valido(repo, conn):
+    did = _det_id(conn)
+    m = _crea(repo, conn, dettaglio_id=did)
+    assert m.dettaglio_id == did
+
+
+def test_update_con_dettaglio_id(repo, conn):
+    did = _det_id(conn)
+    m = _crea(repo, conn)
+    repo.update_movimento(m.id, dettaglio_id=did)
+    aggiornato = repo.list(sezione="personale")[0]
+    assert aggiornato.dettaglio_id == did

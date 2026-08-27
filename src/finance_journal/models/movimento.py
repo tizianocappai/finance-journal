@@ -13,5 +13,6 @@ class Movimento:
     metodo_id: int
     sezione: SezioneMovimento
     nota: str = ""
+    dettaglio_id: int | None = None
     id: int | None = None
     created_at: datetime | None = None

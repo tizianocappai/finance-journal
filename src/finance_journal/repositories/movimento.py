@@ -17,12 +17,13 @@ class MovimentoRepository:
         metodo_id: int,
         sezione: str = "personale",
         nota: str = "",
+        dettaglio_id: int | None = None,
     ) -> Movimento:
         cur = self._conn.execute(
             """INSERT INTO movimenti
-               (data, tipo, importo, categoria_id, metodo_id, sezione, nota)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (data.isoformat(), tipo, importo, categoria_id, metodo_id, sezione, nota),
+               (data, tipo, importo, categoria_id, metodo_id, sezione, nota, dettaglio_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (data.isoformat(), tipo, importo, categoria_id, metodo_id, sezione, nota, dettaglio_id),
         )
         self._conn.commit()
         return self._fetch_by_id(cur.lastrowid)
@@ -67,7 +68,7 @@ class MovimentoRepository:
         return [self._row_to_movimento(r) for r in rows]
 
     def update_movimento(self, movimento_id: int, **campi) -> None:
-        allowed = {"data", "tipo", "importo", "categoria_id", "metodo_id", "sezione", "nota"}
+        allowed = {"data", "tipo", "importo", "categoria_id", "metodo_id", "sezione", "nota", "dettaglio_id"}
         updates = {k: v for k, v in campi.items() if k in allowed}
         if not updates:
             return
@@ -100,5 +101,6 @@ class MovimentoRepository:
             metodo_id=row["metodo_id"],
             sezione=SezioneMovimento(row["sezione"]),
             nota=row["nota"],
+            dettaglio_id=row["dettaglio_id"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )
