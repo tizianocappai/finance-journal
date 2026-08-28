@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './ipc/types';
 
 try {
   contextBridge.exposeInMainWorld('electronAPI', {
@@ -21,6 +22,16 @@ try {
       delete: (id: number) => ipcRenderer.invoke('dettagli:delete', { id }),
       updateCategoria: (id: number, categoria_id: number | null) =>
         ipcRenderer.invoke('dettagli:update-categoria', { id, categoria_id }),
+    },
+    movimenti: {
+      list: (filters: MovimentoFilters = {}) =>
+        ipcRenderer.invoke('movimenti:list', filters),
+      create: (data: MovimentoCreate) =>
+        ipcRenderer.invoke('movimenti:create', data),
+      update: (id: number, data: MovimentoUpdate) =>
+        ipcRenderer.invoke('movimenti:update', { id, ...data }),
+      delete: (id: number) =>
+        ipcRenderer.invoke('movimenti:delete', { id }),
     },
   });
 } catch (err) {

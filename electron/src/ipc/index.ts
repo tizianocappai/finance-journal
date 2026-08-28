@@ -8,6 +8,13 @@ import {
   deleteDettaglio,
   updateDettaglioCategoria,
 } from './dettagli';
+import {
+  listMovimenti,
+  createMovimento,
+  updateMovimento,
+  deleteMovimento,
+} from './movimenti';
+import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
 
 export function registerLookupHandlers(
   ipcMain: IpcMain,
@@ -38,5 +45,18 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('dettagli:update-categoria', (_e, { id, categoria_id }: { id: number; categoria_id: number | null }) =>
     updateDettaglioCategoria(db, id, categoria_id),
+  );
+
+  ipcMain.handle('movimenti:list', (_e, filters: MovimentoFilters = {}) =>
+    listMovimenti(db, filters),
+  );
+  ipcMain.handle('movimenti:create', (_e, data: MovimentoCreate) =>
+    createMovimento(db, data),
+  );
+  ipcMain.handle('movimenti:update', (_e, { id, ...data }: { id: number } & MovimentoUpdate) =>
+    updateMovimento(db, id, data),
+  );
+  ipcMain.handle('movimenti:delete', (_e, { id }: { id: number }) =>
+    deleteMovimento(db, id),
   );
 }

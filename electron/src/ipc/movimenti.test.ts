@@ -1,0 +1,193 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { initDatabase } from '../db/index';
+import type Database from 'better-sqlite3';
+import {
+  listMovimenti,
+  createMovimento,
+  updateMovimento,
+  deleteMovimento,
+} from './movimenti';
+import { listCategorie } from './categorie';
+import { listMetodi } from './metodi_pagamento';
+
+let db: Database.Database;
+
+beforeEach(() => {
+  db = initDatabase(':memory:');
+});
+
+afterEach(() => {
+  db.close();
+});
+
+function seed(db: Database.Database) {
+  const cat = listCategorie(db).find((c) => c.nome === 'Alimentari')!;
+  const metodo = listMetodi(db).find((m) => m.nome === 'Contanti')!;
+  return { cat, metodo };
+}
+
+describe('createMovimento', () => {
+  it('crea un movimento e lo restituisce', () => {
+    const mov = createMovimento(db, {
+      data: '2024-03-15',
+      importo: 50,
+      tipo: 'uscita',
+    });
+    expect(mov.id).toBeTypeOf('number');
+    expect(mov.tipo).toBe('uscita');
+    expect(mov.importo).toBe(50);
+    expect(mov.data).toBe('2024-03-15');
+  });
+
+  it('accetta tutti i campi opzionali', () => {
+    const { cat, metodo } = seed(db);
+    const mov = createMovimento(db, {
+      data: '2024-01-10',
+      importo: 100,
+      tipo: 'entrata',
+      descrizione: 'Stipendio',
+      categoria_id: cat.id,
+      metodo_id: metodo.id,
+    });
+    expect(mov.descrizione).toBe('Stipendio');
+    expect(mov.categoria_id).toBe(cat.id);
+    expect(mov.metodo_id).toBe(metodo.id);
+  });
+});
+
+describe('listMovimenti', () => {
+  beforeEach(() => {
+    const { cat, metodo } = seed(db);
+    createMovimento(db, { data: '2024-01-10', importo: 100, tipo: 'entrata', descrizione: 'Stipendio', categoria_id: cat.id, metodo_id: metodo.id });
+    createMovimento(db, { data: '2024-01-20', importo: 30,  tipo: 'uscita',  descrizione: 'Spesa supermercato' });
+    createMovimento(db, { data: '2024-02-05', importo: 15,  tipo: 'uscita',  descrizione: 'Caffè' });
+    createMovimento(db, { data: '2025-01-01', importo: 200, tipo: 'entrata', descrizione: 'Bonus anno nuovo' });
+  });
+
+  it('restituisce tutti i movimenti senza filtri', () => {
+    expect(listMovimenti(db)).toHaveLength(4);
+  });
+
+  it('filtra per anno', () => {
+    const result = listMovimenti(db, { anno: 2024 });
+    expect(result).toHaveLength(3);
+    result.forEach((m) => expect(m.data.startsWith('2024')).toBe(true));
+  });
+
+  it('filtra per mese e anno', () => {
+    const result = listMovimenti(db, { anno: 2024, mese: 1 });
+    expect(result).toHaveLength(2);
+  });
+
+  it('filtra per mese senza anno', () => {
+    const result = listMovimenti(db, { mese: 1 });
+    expect(result).toHaveLength(3);
+    result.forEach((m) => expect(m.data).toMatch(/-01-/));
+  });
+
+  it('filtra per tipo entrata', () => {
+    const result = listMovimenti(db, { tipo: 'entrata' });
+    expect(result.every((m) => m.tipo === 'entrata')).toBe(true);
+  });
+
+  it('filtra per tipo uscita', () => {
+    const result = listMovimenti(db, { tipo: 'uscita' });
+    expect(result.every((m) => m.tipo === 'uscita')).toBe(true);
+  });
+
+  it('filtra per categoria_id', () => {
+    const { cat } = seed(db);
+    const result = listMovimenti(db, { categoria_id: cat.id });
+    expect(result).toHaveLength(1);
+    expect(result[0].categoria_id).toBe(cat.id);
+  });
+
+  it('filtra per metodo_id', () => {
+    const { metodo } = seed(db);
+    const result = listMovimenti(db, { metodo_id: metodo.id });
+    expect(result).toHaveLength(1);
+    expect(result[0].metodo_id).toBe(metodo.id);
+  });
+
+  it('filtra per testo nella descrizione', () => {
+    const result = listMovimenti(db, { testo: 'Stipendio' });
+    expect(result).toHaveLength(1);
+    expect(result[0].descrizione).toBe('Stipendio');
+  });
+
+  it('ricerca testo parziale', () => {
+    const result = listMovimenti(db, { testo: 'Bonus' });
+    expect(result).toHaveLength(1);
+  });
+
+  it('restituisce categoria_nome e metodo_nome dal JOIN', () => {
+    const { cat, metodo } = seed(db);
+    const result = listMovimenti(db, { testo: 'Stipendio' });
+    expect(result[0].categoria_nome).toBe(cat.nome);
+    expect(result[0].metodo_nome).toBe(metodo.nome);
+  });
+
+  it('ordina per data DESC', () => {
+    const result = listMovimenti(db, { anno: 2024 });
+    const dates = result.map((m) => m.data);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it('restituisce lista vuota se nessun match', () => {
+    expect(listMovimenti(db, { testo: 'xyz_nessun_match' })).toHaveLength(0);
+  });
+});
+
+describe('updateMovimento', () => {
+  it('aggiorna i campi del movimento', () => {
+    const mov = createMovimento(db, { data: '2024-01-10', importo: 50, tipo: 'uscita' });
+    const updated = updateMovimento(db, mov.id, {
+      data: '2024-02-20',
+      importo: 75,
+      tipo: 'entrata',
+      descrizione: 'Aggiornato',
+    });
+    expect(updated.data).toBe('2024-02-20');
+    expect(updated.importo).toBe(75);
+    expect(updated.tipo).toBe('entrata');
+    expect(updated.descrizione).toBe('Aggiornato');
+  });
+
+  it('lancia errore se il movimento non esiste', () => {
+    expect(() =>
+      updateMovimento(db, 9999, { data: '2024-01-01', importo: 1, tipo: 'uscita' }),
+    ).toThrow(/non trovato/i);
+  });
+
+  it('permette di azzerare i campi nullable', () => {
+    const { cat } = seed(db);
+    const mov = createMovimento(db, {
+      data: '2024-01-10',
+      importo: 50,
+      tipo: 'uscita',
+      categoria_id: cat.id,
+      descrizione: 'Descrizione',
+    });
+    const updated = updateMovimento(db, mov.id, {
+      data: mov.data,
+      importo: mov.importo,
+      tipo: mov.tipo,
+      categoria_id: null,
+      descrizione: null,
+    });
+    expect(updated.categoria_id).toBeNull();
+    expect(updated.descrizione).toBeNull();
+  });
+});
+
+describe('deleteMovimento', () => {
+  it('elimina il movimento', () => {
+    const mov = createMovimento(db, { data: '2024-01-10', importo: 50, tipo: 'uscita' });
+    deleteMovimento(db, mov.id);
+    expect(listMovimenti(db)).toHaveLength(0);
+  });
+
+  it('lancia errore se il movimento non esiste', () => {
+    expect(() => deleteMovimento(db, 9999)).toThrow();
+  });
+});

@@ -1,6 +1,15 @@
 /// <reference types="vite/client" />
 
-import type { Categoria, MetodoPagamento, Dettaglio } from './ipc/types';
+import type {
+  Categoria,
+  MetodoPagamento,
+  Dettaglio,
+  Movimento,
+  MovimentoWithLookup,
+  MovimentoFilters,
+  MovimentoCreate,
+  MovimentoUpdate,
+} from './ipc/types';
 
 declare global {
   interface Window {
@@ -20,6 +29,12 @@ declare global {
         create: (data: { nome: string; categoria_id?: number }) => Promise<Dettaglio>;
         delete: (id: number) => Promise<void>;
         updateCategoria: (id: number, categoria_id: number | null) => Promise<Dettaglio>;
+      };
+      movimenti: {
+        list: (filters?: MovimentoFilters) => Promise<MovimentoWithLookup[]>;
+        create: (data: MovimentoCreate) => Promise<Movimento>;
+        update: (id: number, data: MovimentoUpdate) => Promise<Movimento>;
+        delete: (id: number) => Promise<void>;
       };
     };
   }

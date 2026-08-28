@@ -5,15 +5,20 @@ import type { ColDef } from 'ag-grid-community';
 import type { AgChartOptions } from 'ag-charts-community';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
 import { getAgGridTheme, getAgChartsTheme } from '@/lib/ag-theme';
-import type { MovimentoRow } from '@/types/movimento';
+interface SampleRow {
+  data: string;
+  descrizione: string;
+  importo: number;
+  categoria: string;
+}
 
-const SAMPLE_ROW_DATA: MovimentoRow[] = [
+const SAMPLE_ROW_DATA: SampleRow[] = [
   { data: '2026-08-01', descrizione: 'Spesa supermercato', importo: -85.4, categoria: 'Alimentari' },
   { data: '2026-08-05', descrizione: 'Stipendio', importo: 2400, categoria: 'Entrate' },
   { data: '2026-08-10', descrizione: 'Bolletta luce', importo: -62.0, categoria: 'Utenze' },
 ];
 
-const COL_DEFS: ColDef<MovimentoRow>[] = [
+const COL_DEFS: ColDef<SampleRow>[] = [
   { field: 'data', flex: 1 },
   { field: 'descrizione', flex: 2 },
   { field: 'categoria', flex: 1 },
@@ -51,7 +56,7 @@ export default function DashboardScreen() {
           Ultimi movimenti
         </h2>
         <div className="h-52 w-full rounded-lg border border-border overflow-hidden">
-          <AgGridReact<MovimentoRow>
+          <AgGridReact<SampleRow>
             theme={gridTheme}
             rowData={SAMPLE_ROW_DATA}
             columnDefs={COL_DEFS}
