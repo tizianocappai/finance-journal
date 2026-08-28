@@ -4,12 +4,14 @@ import logging
 import sqlite3
 from pathlib import Path
 
+from PyQt6.QtCore import QEventLoop, QObject, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QLabel,
     QMessageBox,
+    QProgressDialog,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -18,6 +20,56 @@ from PyQt6.QtWidgets import (
 from finance_journal.import_csv import ImportCSVError, ImportResult, analyse_csv, import_csv
 
 logger = logging.getLogger(__name__)
+
+
+class _CsvWorker(QObject):
+    finished = pyqtSignal(object)
+
+    def __init__(self, operation, db_path: Path, csv_path: Path) -> None:
+        super().__init__()
+        self._operation = operation
+        self._db_path = db_path
+        self._csv_path = csv_path
+
+    def run(self) -> None:
+        conn = sqlite3.connect(str(self._db_path))
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        try:
+            result = self._operation(conn, self._csv_path)
+            self.finished.emit(result)
+        except Exception as exc:
+            self.finished.emit(exc)
+        finally:
+            conn.close()
+
+
+def _run_csv_op(operation, db_path: Path, csv_path: Path, parent: QWidget | None, label: str) -> ImportResult:
+    progress = QProgressDialog(label, None, 0, 0, parent)
+    progress.setWindowTitle("Elaborazione...")
+    progress.setMinimumDuration(0)
+    progress.setValue(0)
+
+    result_holder: list = []
+    loop = QEventLoop()
+
+    worker = _CsvWorker(operation, db_path, csv_path)
+    thread = QThread()
+    worker.moveToThread(thread)
+    thread.started.connect(worker.run)
+    worker.finished.connect(lambda r: result_holder.append(r))
+    worker.finished.connect(loop.quit)
+    worker.finished.connect(thread.quit)
+
+    thread.start()
+    loop.exec()
+    thread.wait()
+    progress.close()
+
+    result = result_holder[0]
+    if isinstance(result, Exception):
+        raise result
+    return result
 
 
 def _show_new_entities(layout: QVBoxLayout, result: ImportResult) -> None:
@@ -88,8 +140,12 @@ def run_import_csv_flow(conn: sqlite3.Connection, parent: QWidget | None = None)
     if not path:
         return False
 
+    db_row = conn.execute("PRAGMA database_list").fetchone()
+    db_path = Path(db_row["file"])
+    csv_path = Path(path)
+
     try:
-        preview = analyse_csv(conn, Path(path))
+        preview = _run_csv_op(analyse_csv, db_path, csv_path, parent, "Analisi CSV in corso...")
     except (OSError, ImportCSVError) as e:
         logger.exception("Errore durante l'analisi del CSV: %s", path)
         QMessageBox.critical(parent, "Errore import CSV", str(e))
@@ -100,7 +156,7 @@ def run_import_csv_flow(conn: sqlite3.Connection, parent: QWidget | None = None)
         return False
 
     try:
-        result = import_csv(conn, Path(path))
+        result = _run_csv_op(import_csv, db_path, csv_path, parent, "Import CSV in corso...")
     except (OSError, ImportCSVError) as e:
         logger.exception("Errore durante l'import del CSV: %s", path)
         QMessageBox.critical(parent, "Errore import CSV", str(e))

@@ -84,13 +84,24 @@ def _analyse(conn: sqlite3.Connection, path: Path) -> _Analysis:
         for r in conn.execute("SELECT id, nome, categoria_id FROM dettagli").fetchall()
     }
 
+    _MAX_EMPTY_STREAK = 2
+
     date_fmt: str | None = None
     new_cats: dict[str, str] = {}
     new_accs: dict[str, str] = {}
     new_dets: dict[str, tuple[str, str]] = {}
     valid_rows: list[dict] = []
+    empty_streak = 0
 
     for i, raw in enumerate(raw_rows, start=2):
+        if all(not (v or "").strip() for v in raw.values()):
+            empty_streak += 1
+            if empty_streak > _MAX_EMPTY_STREAK:
+                logger.debug("Riga %d: interrotto per %d righe vuote consecutive", i, empty_streak)
+                break
+            continue
+        empty_streak = 0
+
         tipo_str = get_col(raw, "tipo")
         importo_str = get_col(raw, "importo")
         categoria_str = get_col(raw, "categoria")

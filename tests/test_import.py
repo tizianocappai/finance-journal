@@ -305,3 +305,47 @@ def test_import_fallito_zero_righe_emette_warning(conn, tmp_path, caplog):
         result = import_csv(conn, p)
     assert result.importati == 0
     assert any("nessuna riga valida" in r.message.lower() for r in caplog.records if r.levelname == "WARNING")
+
+
+# --- righe vuote consecutive ---
+
+_EMPTY_ROW = {"Data": "", "Tipo": "", "Importo": "", "Account": "", "Dettaglio": "", "Categoria": "", "Note": ""}
+_VALID_ROW = {"Data": "2025-01-01", "Tipo": "Uscita", "Importo": "10",
+              "Account": "Contanti", "Dettaglio": "", "Categoria": "Spesa", "Note": ""}
+
+
+def test_tre_righe_vuote_consecutive_interrompono_import(conn, tmp_path):
+    p = _make_csv(tmp_path, [
+        _VALID_ROW,
+        _EMPTY_ROW,
+        _EMPTY_ROW,
+        _EMPTY_ROW,
+        {**_VALID_ROW, "Data": "2025-02-01"},
+    ])
+    result = import_csv(conn, p)
+    assert result.importati == 1
+
+
+def test_due_righe_vuote_consecutive_non_interrompono_import(conn, tmp_path):
+    p = _make_csv(tmp_path, [
+        _VALID_ROW,
+        _EMPTY_ROW,
+        _EMPTY_ROW,
+        {**_VALID_ROW, "Data": "2025-02-01"},
+    ])
+    result = import_csv(conn, p)
+    assert result.importati == 2
+
+
+def test_righe_vuote_sparse_non_interrompono_import(conn, tmp_path):
+    p = _make_csv(tmp_path, [
+        _VALID_ROW,
+        _EMPTY_ROW,
+        {**_VALID_ROW, "Data": "2025-02-01"},
+        _EMPTY_ROW,
+        {**_VALID_ROW, "Data": "2025-03-01"},
+        _EMPTY_ROW,
+        {**_VALID_ROW, "Data": "2025-04-01"},
+    ])
+    result = import_csv(conn, p)
+    assert result.importati == 4
