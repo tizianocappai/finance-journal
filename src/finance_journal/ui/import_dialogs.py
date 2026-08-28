@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from PyQt6.QtWidgets import (
 )
 
 from finance_journal.import_csv import ImportCSVError, ImportResult, analyse_csv, import_csv
+
+logger = logging.getLogger(__name__)
 
 
 def _show_new_entities(layout: QVBoxLayout, result: ImportResult) -> None:
@@ -88,6 +91,7 @@ def run_import_csv_flow(conn: sqlite3.Connection, parent: QWidget | None = None)
     try:
         preview = analyse_csv(conn, Path(path))
     except (OSError, ImportCSVError) as e:
+        logger.exception("Errore durante l'analisi del CSV: %s", path)
         QMessageBox.critical(parent, "Errore import CSV", str(e))
         return False
 
@@ -98,6 +102,7 @@ def run_import_csv_flow(conn: sqlite3.Connection, parent: QWidget | None = None)
     try:
         result = import_csv(conn, Path(path))
     except (OSError, ImportCSVError) as e:
+        logger.exception("Errore durante l'import del CSV: %s", path)
         QMessageBox.critical(parent, "Errore import CSV", str(e))
         return False
 

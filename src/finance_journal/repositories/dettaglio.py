@@ -1,6 +1,9 @@
+import logging
 import sqlite3
 
 from finance_journal.models import Dettaglio
+
+logger = logging.getLogger(__name__)
 
 
 class DettaglioRepository:
@@ -22,6 +25,7 @@ class DettaglioRepository:
             (nome, categoria_id),
         )
         self._conn.commit()
+        logger.info("dettaglio '%s' creato (id=%d)", nome, cur.lastrowid)
         return Dettaglio(id=cur.lastrowid, nome=nome, categoria_id=categoria_id, predefinita=False)
 
     def count_in_uso(self, dettaglio_id: int) -> int:
@@ -51,3 +55,4 @@ class DettaglioRepository:
         )
         self._conn.execute("DELETE FROM dettagli WHERE id = ?", (dettaglio_id,))
         self._conn.commit()
+        logger.info("dettaglio #%d eliminato", dettaglio_id)

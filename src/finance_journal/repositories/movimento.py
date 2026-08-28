@@ -1,7 +1,10 @@
+import logging
 import sqlite3
 from datetime import date, datetime
 
 from finance_journal.models import Movimento, TipoMovimento, SezioneMovimento
+
+logger = logging.getLogger(__name__)
 
 
 class MovimentoRepository:
@@ -26,7 +29,9 @@ class MovimentoRepository:
             (data.isoformat(), tipo, importo, categoria_id, metodo_id, sezione, nota, dettaglio_id),
         )
         self._conn.commit()
-        return self._fetch_by_id(cur.lastrowid)
+        movimento = self._fetch_by_id(cur.lastrowid)
+        logger.info("movimento #%d creato (tipo=%s, importo=%s)", movimento.id, tipo, importo)
+        return movimento
 
     def list(
         self,
@@ -80,10 +85,12 @@ class MovimentoRepository:
             [*updates.values(), movimento_id],
         )
         self._conn.commit()
+        logger.info("movimento #%d aggiornato", movimento_id)
 
     def delete_movimento(self, movimento_id: int) -> None:
         self._conn.execute("DELETE FROM movimenti WHERE id = ?", (movimento_id,))
         self._conn.commit()
+        logger.info("movimento #%d eliminato", movimento_id)
 
     def delete_all(
         self,
@@ -118,8 +125,9 @@ class MovimentoRepository:
             params.append(f"%{testo}%")
 
         where = " AND ".join(clauses)
-        self._conn.execute(f"DELETE FROM movimenti WHERE {where}", params)
+        cur = self._conn.execute(f"DELETE FROM movimenti WHERE {where}", params)
         self._conn.commit()
+        logger.info("delete_all: %d movimenti eliminati", cur.rowcount)
 
     def list_anni(self, sezione: str = "personale") -> list[int]:
         rows = self._conn.execute(

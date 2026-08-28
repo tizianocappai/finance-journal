@@ -257,3 +257,51 @@ def test_import_colonna_dettaglio_assente(conn, tmp_path):
     result = import_csv(conn, p)
     assert result.importati == 1
     assert conn.execute("SELECT dettaglio_id FROM movimenti").fetchone()["dettaglio_id"] is None
+
+
+# --- logging ---
+
+import logging
+
+
+def test_riga_saltata_emette_warning(conn, tmp_path, caplog):
+    p = _make_csv(tmp_path, [
+        {"Data": "2025-01-01", "Tipo": "INVALIDO", "Importo": "10",
+         "Account": "Contanti", "Dettaglio": "", "Categoria": "Spesa", "Note": ""},
+    ])
+    with caplog.at_level(logging.WARNING, logger="finance_journal.import_csv"):
+        import_csv(conn, p)
+    assert any("WARNING" in r.levelname and "INVALIDO" in r.message for r in caplog.records)
+
+
+def test_import_completato_emette_info(conn, tmp_path, caplog):
+    p = _make_csv(tmp_path, [
+        {"Data": "2025-01-01", "Tipo": "Entrata", "Importo": "100",
+         "Account": "Contanti", "Dettaglio": "", "Categoria": "Stipendio", "Note": ""},
+    ])
+    with caplog.at_level(logging.INFO, logger="finance_journal.import_csv"):
+        import_csv(conn, p)
+    messages = [r.message for r in caplog.records if r.levelname == "INFO"]
+    assert any("1" in m for m in messages)
+
+
+def test_import_nessuna_riga_valida_emette_warning(conn, tmp_path, caplog):
+    p = _make_csv(tmp_path, [
+        {"Data": "2025-01-01", "Tipo": "INVALIDO", "Importo": "10",
+         "Account": "Contanti", "Dettaglio": "", "Categoria": "Spesa", "Note": ""},
+    ])
+    with caplog.at_level(logging.WARNING, logger="finance_journal.import_csv"):
+        import_csv(conn, p)
+    warnings = [r.message for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) >= 1
+
+
+def test_import_fallito_zero_righe_emette_warning(conn, tmp_path, caplog):
+    p = _make_csv(tmp_path, [
+        {"Data": "2025-01-01", "Tipo": "INVALIDO", "Importo": "10",
+         "Account": "Contanti", "Dettaglio": "", "Categoria": "Spesa", "Note": ""},
+    ])
+    with caplog.at_level(logging.WARNING, logger="finance_journal.import_csv"):
+        result = import_csv(conn, p)
+    assert result.importati == 0
+    assert any("nessuna riga valida" in r.message.lower() for r in caplog.records if r.levelname == "WARNING")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import date
 
@@ -30,6 +31,8 @@ from finance_journal.repositories.metodo_pagamento import MetodoPagamentoReposit
 from finance_journal.repositories.movimento import MovimentoRepository
 from finance_journal.ui.import_dialogs import run_import_csv_flow
 from finance_journal.ui.movimento_dialog import MovimentoDialog
+
+logger = logging.getLogger(__name__)
 
 _SEZIONE = "personale"
 
@@ -258,16 +261,20 @@ class MovimentiWidget(QWidget):
         )
         if dialog.exec() == MovimentoDialog.DialogCode.Accepted:
             d = dialog.get_data()
-            self._repo_mov.create_movimento(
-                data=d["data"],
-                tipo=d["tipo"],
-                importo=d["importo"],
-                categoria_id=d["categoria_id"],
-                metodo_id=d["metodo_id"],
-                sezione=_SEZIONE,
-                nota=d["nota"],
-                dettaglio_id=d["dettaglio_id"],
-            )
+            try:
+                self._repo_mov.create_movimento(
+                    data=d["data"],
+                    tipo=d["tipo"],
+                    importo=d["importo"],
+                    categoria_id=d["categoria_id"],
+                    metodo_id=d["metodo_id"],
+                    sezione=_SEZIONE,
+                    nota=d["nota"],
+                    dettaglio_id=d["dettaglio_id"],
+                )
+            except Exception:
+                logger.exception("Errore durante la creazione del movimento")
+                raise
             self._refresh()
 
     def _on_modifica(self, row: int) -> None:
@@ -283,16 +290,20 @@ class MovimentiWidget(QWidget):
         if dialog.exec() != MovimentoDialog.DialogCode.Accepted:
             return
         d = dialog.get_data()
-        self._repo_mov.update_movimento(
-            movimento.id,
-            data=d["data"],
-            tipo=d["tipo"],
-            importo=d["importo"],
-            categoria_id=d["categoria_id"],
-            metodo_id=d["metodo_id"],
-            nota=d["nota"],
-            dettaglio_id=d["dettaglio_id"],
-        )
+        try:
+            self._repo_mov.update_movimento(
+                movimento.id,
+                data=d["data"],
+                tipo=d["tipo"],
+                importo=d["importo"],
+                categoria_id=d["categoria_id"],
+                metodo_id=d["metodo_id"],
+                nota=d["nota"],
+                dettaglio_id=d["dettaglio_id"],
+            )
+        except Exception:
+            logger.exception("Errore durante l'aggiornamento del movimento #%d", movimento.id)
+            raise
         self._refresh()
 
     def _on_elimina_tutti(self) -> None:
@@ -305,15 +316,19 @@ class MovimentiWidget(QWidget):
             QMessageBox.StandardButton.No,
         )
         if risposta == QMessageBox.StandardButton.Yes:
-            self._repo_mov.delete_all(
-                sezione=_SEZIONE,
-                anno=self._anno_combo.currentData(),
-                mese=self._mese_combo.currentData(),
-                tipo=self._tipo_combo.currentData(),
-                categoria_id=self._cat_filter.currentData(),
-                metodo_id=self._met_filter.currentData(),
-                testo=self._search_edit.text().strip() or None,
-            )
+            try:
+                self._repo_mov.delete_all(
+                    sezione=_SEZIONE,
+                    anno=self._anno_combo.currentData(),
+                    mese=self._mese_combo.currentData(),
+                    tipo=self._tipo_combo.currentData(),
+                    categoria_id=self._cat_filter.currentData(),
+                    metodo_id=self._met_filter.currentData(),
+                    testo=self._search_edit.text().strip() or None,
+                )
+            except Exception:
+                logger.exception("Errore durante l'eliminazione massiva dei movimenti")
+                raise
             self._refresh()
 
     def _on_elimina_riga(self, row: int) -> None:
@@ -328,5 +343,9 @@ class MovimentiWidget(QWidget):
             QMessageBox.StandardButton.No,
         )
         if risposta == QMessageBox.StandardButton.Yes:
-            self._repo_mov.delete_movimento(movimento.id)
+            try:
+                self._repo_mov.delete_movimento(movimento.id)
+            except Exception:
+                logger.exception("Errore durante l'eliminazione del movimento #%d", movimento.id)
+                raise
             self._refresh()

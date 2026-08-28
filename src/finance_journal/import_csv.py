@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -8,6 +9,8 @@ from pathlib import Path
 
 _DATE_FORMATS = ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"]
 _SEZIONE = "personale"
+
+logger = logging.getLogger(__name__)
 
 
 class ImportCSVError(Exception):
@@ -51,8 +54,14 @@ def _detect_date_format(value: str) -> str | None:
 def _analyse(conn: sqlite3.Connection, path: Path) -> _Analysis:
     result = ImportResult()
 
-    with open(path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        sample = f.read(4096)
+        f.seek(0)
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+        except csv.Error:
+            dialect = csv.excel
+        reader = csv.DictReader(f, dialect=dialect)
         if reader.fieldnames is None:
             raise ImportCSVError("Il file CSV non contiene un header valido.")
         col_map = {name.lower(): name for name in reader.fieldnames}
@@ -92,7 +101,9 @@ def _analyse(conn: sqlite3.Connection, path: Path) -> _Analysis:
 
         tipo_lower = tipo_str.lower()
         if tipo_lower not in ("entrata", "uscita"):
-            result.saltati.append(RigaSaltata(i, f"Tipo non riconosciuto: '{tipo_str}'"))
+            motivo = f"Tipo non riconosciuto: '{tipo_str}'"
+            result.saltati.append(RigaSaltata(i, motivo))
+            logger.warning("Riga %d saltata: %s", i, motivo)
             continue
 
         try:
@@ -100,27 +111,37 @@ def _analyse(conn: sqlite3.Connection, path: Path) -> _Analysis:
             if importo <= 0:
                 raise ValueError
         except ValueError:
-            result.saltati.append(RigaSaltata(i, f"Importo non valido: '{importo_str}'"))
+            motivo = f"Importo non valido: '{importo_str}'"
+            result.saltati.append(RigaSaltata(i, motivo))
+            logger.warning("Riga %d saltata: %s", i, motivo)
             continue
 
         if not categoria_str:
-            result.saltati.append(RigaSaltata(i, "Categoria mancante"))
+            motivo = "Categoria mancante"
+            result.saltati.append(RigaSaltata(i, motivo))
+            logger.warning("Riga %d saltata: %s", i, motivo)
             continue
 
         if date_fmt is None:
             date_fmt = _detect_date_format(data_str)
             if date_fmt is None:
-                result.saltati.append(RigaSaltata(i, f"Data non riconoscibile: '{data_str}'"))
+                motivo = f"Data non riconoscibile: '{data_str}'"
+                result.saltati.append(RigaSaltata(i, motivo))
+                logger.warning("Riga %d saltata: %s", i, motivo)
                 continue
 
         try:
             data = datetime.strptime(data_str, date_fmt).date()
         except ValueError:
-            result.saltati.append(RigaSaltata(i, f"Data non valida: '{data_str}'"))
+            motivo = f"Data non valida: '{data_str}'"
+            result.saltati.append(RigaSaltata(i, motivo))
+            logger.warning("Riga %d saltata: %s", i, motivo)
             continue
 
         if not account_str:
-            result.saltati.append(RigaSaltata(i, "Account mancante"))
+            motivo = "Account mancante"
+            result.saltati.append(RigaSaltata(i, motivo))
+            logger.warning("Riga %d saltata: %s", i, motivo)
             continue
 
         cat_lower = categoria_str.lower()
@@ -161,6 +182,7 @@ def import_csv(conn: sqlite3.Connection, path: Path) -> ImportResult:
 
     if not analysis.valid_rows:
         result.importati = 0
+        logger.warning("Import fallito: nessuna riga valida nel file CSV")
         return result
 
     cat_by_name: dict[str, dict] = {
@@ -212,4 +234,9 @@ def import_csv(conn: sqlite3.Connection, path: Path) -> ImportResult:
             )
             result.importati += 1
 
+    logger.info(
+        "Import completato: %d movimenti importati, %d righe saltate",
+        result.importati,
+        len(result.saltati),
+    )
     return result

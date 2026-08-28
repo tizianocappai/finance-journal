@@ -1,7 +1,10 @@
+import logging
 import sqlite3
 
 from finance_journal.db.schema import FALLBACK_NOME
 from finance_journal.models import Categoria
+
+logger = logging.getLogger(__name__)
 
 
 class CategoriaRepository:
@@ -19,6 +22,7 @@ class CategoriaRepository:
             "INSERT INTO categorie (nome, predefinita) VALUES (?, 0)", (nome,)
         )
         self._conn.commit()
+        logger.info("categoria '%s' creata (id=%d)", nome, cur.lastrowid)
         return Categoria(id=cur.lastrowid, nome=nome, predefinita=False)
 
     def count_in_uso(self, categoria_id: int) -> int:
@@ -45,3 +49,4 @@ class CategoriaRepository:
         )
         self._conn.execute("DELETE FROM categorie WHERE id = ?", (categoria_id,))
         self._conn.commit()
+        logger.info("categoria #%d eliminata", categoria_id)

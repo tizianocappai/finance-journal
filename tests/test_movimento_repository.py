@@ -274,3 +274,40 @@ def test_update_con_dettaglio_id(repo, conn):
     repo.update_movimento(m.id, dettaglio_id=did)
     aggiornato = repo.list(sezione="personale")[0]
     assert aggiornato.dettaglio_id == did
+
+
+# --- logging ---
+
+import logging
+
+
+def test_create_emette_info(repo, conn, caplog):
+    with caplog.at_level(logging.INFO, logger="finance_journal.repositories.movimento"):
+        m = _crea(repo, conn)
+    messages = [r.message for r in caplog.records if r.levelname == "INFO"]
+    assert any(str(m.id) in msg for msg in messages)
+
+
+def test_update_emette_info(repo, conn, caplog):
+    m = _crea(repo, conn)
+    with caplog.at_level(logging.INFO, logger="finance_journal.repositories.movimento"):
+        repo.update_movimento(m.id, importo=999.0)
+    messages = [r.message for r in caplog.records if r.levelname == "INFO"]
+    assert any(str(m.id) in msg for msg in messages)
+
+
+def test_delete_emette_info(repo, conn, caplog):
+    m = _crea(repo, conn)
+    with caplog.at_level(logging.INFO, logger="finance_journal.repositories.movimento"):
+        repo.delete_movimento(m.id)
+    messages = [r.message for r in caplog.records if r.levelname == "INFO"]
+    assert any(str(m.id) in msg for msg in messages)
+
+
+def test_delete_all_emette_info_con_conteggio(repo, conn, caplog):
+    _crea(repo, conn)
+    _crea(repo, conn)
+    with caplog.at_level(logging.INFO, logger="finance_journal.repositories.movimento"):
+        repo.delete_all(sezione="personale")
+    messages = [r.message for r in caplog.records if r.levelname == "INFO"]
+    assert any("2" in msg for msg in messages)

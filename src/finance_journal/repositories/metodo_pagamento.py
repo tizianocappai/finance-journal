@@ -1,7 +1,10 @@
+import logging
 import sqlite3
 
 from finance_journal.db.schema import FALLBACK_NOME
 from finance_journal.models import MetodoPagamento
+
+logger = logging.getLogger(__name__)
 
 
 class MetodoPagamentoRepository:
@@ -22,6 +25,7 @@ class MetodoPagamentoRepository:
             "INSERT INTO metodi_pagamento (nome, predefinito) VALUES (?, 0)", (nome,)
         )
         self._conn.commit()
+        logger.info("metodo pagamento '%s' creato (id=%d)", nome, cur.lastrowid)
         return MetodoPagamento(id=cur.lastrowid, nome=nome, predefinito=False)
 
     def count_in_uso(self, metodo_id: int) -> int:
@@ -48,3 +52,4 @@ class MetodoPagamentoRepository:
         )
         self._conn.execute("DELETE FROM metodi_pagamento WHERE id = ?", (metodo_id,))
         self._conn.commit()
+        logger.info("metodo pagamento #%d eliminato", metodo_id)
