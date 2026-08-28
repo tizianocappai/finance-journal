@@ -6,12 +6,16 @@ from datetime import date
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QPushButton,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -20,6 +24,8 @@ from finance_journal.aggregation.dashboard import (
     breakdown_categorie,
     breakdown_mensile,
     kpi_annuali,
+    pivot_categorie,
+    riepilogo_mensile,
     trend_annuale,
 )
 from finance_journal.repositories.categoria import CategoriaRepository
@@ -28,6 +34,59 @@ from finance_journal.repositories.movimento import MovimentoRepository
 
 _MESI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
          "Lug", "Ago", "Set", "Ott", "Nov", "Dic"]
+
+_MESI_FULL = [
+    "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+    "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+]
+
+_COLOR_POSITIVO = QColor("#2e7d32")
+_COLOR_NEGATIVO = QColor("#c62828")
+
+_TIPO_LABEL = {"totale": "Totale", "media": "Media", "mediana": "Mediana"}
+
+
+def _color_item(item: QTableWidgetItem, value: float) -> None:
+    if value > 0:
+        item.setForeground(_COLOR_POSITIVO)
+    elif value < 0:
+        item.setForeground(_COLOR_NEGATIVO)
+
+
+_PIVOT_HEADERS = ["Categoria"] + _MESI + ["Totale", "Media", "Mediana"]
+_IDX_TOTALE = _PIVOT_HEADERS.index("Totale")
+_IDX_MEDIA = _PIVOT_HEADERS.index("Media")
+_IDX_MEDIANA = _PIVOT_HEADERS.index("Mediana")
+
+
+def _fmt_val(val: float | None) -> str:
+    return "—" if val is None else f"{val:,.2f}"
+
+
+def _make_amount_item(valuta: str, value: float) -> QTableWidgetItem:
+    return QTableWidgetItem(f"{valuta} {value:,.2f}")
+
+
+def _make_pivot_table() -> QTableWidget:
+    table = QTableWidget()
+    table.setColumnCount(len(_PIVOT_HEADERS))
+    table.setHorizontalHeaderLabels(_PIVOT_HEADERS)
+    table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+    table.verticalHeader().setVisible(False)
+    table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+    table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    return table
+
+
+def _set_table_fixed_height(table: QTableWidget) -> None:
+    if table.rowCount() > 0:
+        table.setFixedHeight(
+            table.horizontalHeader().height()
+            + table.rowHeight(0) * table.rowCount()
+            + 4
+        )
 
 
 class _KpiTile(QFrame):
@@ -60,6 +119,24 @@ class DashboardWidget(QWidget):
         self._repo_cat = CategoriaRepository(conn)
         self._repo_imp = ImpostazioniRepository(conn)
         self._anno = date.today().year
+
+        # tooltip state
+        self._cid_barre: int | None = None
+        self._cid_donut: int | None = None
+        self._cid_trend: int | None = None
+        self._ann_barre = None
+        self._ann_donut = None
+        self._ann_trend = None
+        self._barre_data: list[dict] = []
+        self._barre_rects_e: list = []
+        self._barre_rects_u: list = []
+        self._donut_data: list[dict] = []
+        self._donut_wedges: list = []
+        self._trend_corrente: list[float] = []
+        self._trend_precedente: list[float] = []
+        self._trend_line_corr = None
+        self._trend_line_prec = None
+
         self._build_ui()
         self.refresh()
 
@@ -67,6 +144,11 @@ class DashboardWidget(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(12)
+
+        # Intestazione sezione
+        titolo = QLabel("Resoconto Personale")
+        titolo.setStyleSheet("font-size: 18px; font-weight: bold;")
+        root.addWidget(titolo)
 
         # Anno navigator
         nav = QHBoxLayout()
@@ -123,6 +205,38 @@ class DashboardWidget(QWidget):
         self._canvas_trend.setMinimumHeight(180)
         root.addWidget(self._canvas_trend)
 
+        # Tabella riepilogo mensile
+        lbl_tabella = QLabel("Riepilogo mensile")
+        lbl_tabella.setStyleSheet("font-size: 14px; font-weight: bold;")
+        root.addWidget(lbl_tabella)
+
+        self._table = QTableWidget()
+        self._table.setColumnCount(5)
+        self._table.setHorizontalHeaderLabels(
+            ["Mese", "Entrate", "Uscite", "Saldo", "Δ vs mese prec."]
+        )
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._table.verticalHeader().setVisible(False)
+        self._table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self._table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        root.addWidget(self._table)
+
+        # Pivot uscite
+        lbl_uscite = QLabel("Uscite per categoria")
+        lbl_uscite.setStyleSheet("font-size: 14px; font-weight: bold;")
+        root.addWidget(lbl_uscite)
+        self._table_uscite = _make_pivot_table()
+        root.addWidget(self._table_uscite)
+
+        # Pivot entrate
+        lbl_entrate = QLabel("Entrate per categoria")
+        lbl_entrate.setStyleSheet("font-size: 14px; font-weight: bold;")
+        root.addWidget(lbl_entrate)
+        self._table_entrate = _make_pivot_table()
+        root.addWidget(self._table_entrate)
+
         root.addStretch()
 
     def refresh(self) -> None:
@@ -141,6 +255,8 @@ class DashboardWidget(QWidget):
         self._draw_barre(movimenti)
         self._draw_donut(movimenti, categorie)
         self._draw_trend(movimenti)
+        self._draw_tabella(movimenti, valuta)
+        self._draw_pivot(movimenti, categorie)
 
     def _draw_barre(self, movimenti) -> None:
         data = breakdown_mensile(movimenti, self._anno)
@@ -151,13 +267,28 @@ class DashboardWidget(QWidget):
         ax = self._fig_barre.add_subplot(111)
         x = list(range(12))
         w = 0.35
-        ax.bar([i - w / 2 for i in x], entrate, width=w, label="Entrate", color="#4CAF50")
-        ax.bar([i + w / 2 for i in x], uscite, width=w, label="Uscite", color="#F44336")
+        bc_e = ax.bar([i - w / 2 for i in x], entrate, width=w, label="Entrate", color="#4CAF50")
+        bc_u = ax.bar([i + w / 2 for i in x], uscite, width=w, label="Uscite", color="#F44336")
         ax.set_xticks(x)
         ax.set_xticklabels(_MESI, fontsize=8)
         ax.tick_params(axis="y", labelsize=8)
         ax.legend(fontsize=8)
         ax.set_title("Entrate / Uscite mensili", fontsize=10)
+
+        self._barre_data = data
+        self._barre_rects_e = bc_e.patches
+        self._barre_rects_u = bc_u.patches
+        self._ann_barre = ax.annotate(
+            "", xy=(0, 0), xytext=(10, 10), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#aaaaaa", alpha=0.9),
+            fontsize=8, visible=False,
+        )
+
+        if self._cid_barre is not None:
+            self._canvas_barre.mpl_disconnect(self._cid_barre)
+        self._cid_barre = self._canvas_barre.mpl_connect(
+            "motion_notify_event", self._on_hover_barre
+        )
         self._canvas_barre.draw()
 
     def _draw_donut(self, movimenti, categorie: dict[int, str]) -> None:
@@ -179,11 +310,27 @@ class DashboardWidget(QWidget):
                 t.set_fontsize(7)
             ax.legend(wedges, labels, loc="center left",
                       bbox_to_anchor=(1, 0.5), fontsize=7)
+            self._donut_wedges = list(wedges)
+            self._donut_data = data
         else:
             ax.text(0, 0, "Nessun dato", ha="center", va="center", fontsize=10)
             ax.set_xlim(-1, 1)
             ax.set_ylim(-1, 1)
+            self._donut_wedges = []
+            self._donut_data = []
         ax.set_title("Uscite per Categoria", fontsize=10)
+
+        self._ann_donut = ax.annotate(
+            "", xy=(0, 0), xytext=(10, 10), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#aaaaaa", alpha=0.9),
+            fontsize=8, visible=False,
+        )
+
+        if self._cid_donut is not None:
+            self._canvas_donut.mpl_disconnect(self._cid_donut)
+        self._cid_donut = self._canvas_donut.mpl_connect(
+            "motion_notify_event", self._on_hover_donut
+        )
         self._canvas_donut.draw()
 
     def _draw_trend(self, movimenti) -> None:
@@ -193,17 +340,213 @@ class DashboardWidget(QWidget):
 
         self._fig_trend.clear()
         ax = self._fig_trend.add_subplot(111)
-        ax.plot(_MESI, corrente, marker="o", markersize=4,
-                label=str(self._anno), color="#2196F3", linewidth=1.5)
-        if any(v != 0 for v in precedente):
-            ax.plot(_MESI, precedente, marker="o", markersize=4,
-                    label=str(self._anno - 1), color="#9E9E9E",
-                    linewidth=1.5, linestyle="--")
+        line_corr, = ax.plot(_MESI, corrente, marker="o", markersize=4,
+                             label=str(self._anno), color="#2196F3", linewidth=1.5)
+        line_prec = None
+        has_prec = any(v != 0 for v in precedente)
+        if has_prec:
+            line_prec, = ax.plot(_MESI, precedente, marker="o", markersize=4,
+                                 label=str(self._anno - 1), color="#9E9E9E",
+                                 linewidth=1.5, linestyle="--")
         ax.axhline(0, color="#cccccc", linewidth=0.8)
         ax.tick_params(axis="both", labelsize=8)
         ax.legend(fontsize=8)
         ax.set_title("Trend mensile (saldo)", fontsize=10)
+
+        self._trend_corrente = corrente
+        self._trend_precedente = precedente
+        self._trend_line_corr = line_corr
+        self._trend_line_prec = line_prec
+        self._ann_trend = ax.annotate(
+            "", xy=(0, 0), xytext=(10, 10), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#aaaaaa", alpha=0.9),
+            fontsize=8, visible=False,
+        )
+
+        if self._cid_trend is not None:
+            self._canvas_trend.mpl_disconnect(self._cid_trend)
+        self._cid_trend = self._canvas_trend.mpl_connect(
+            "motion_notify_event", self._on_hover_trend
+        )
         self._canvas_trend.draw()
+
+    def _on_hover_barre(self, event) -> None:
+        if self._ann_barre is None or event.inaxes is None:
+            if self._ann_barre is not None:
+                self._ann_barre.set_visible(False)
+                self._canvas_barre.draw_idle()
+            return
+
+        for i, (rect_e, rect_u) in enumerate(zip(self._barre_rects_e, self._barre_rects_u)):
+            if rect_e.contains(event)[0] or rect_u.contains(event)[0]:
+                d = self._barre_data[i]
+                saldo = d["entrate"] - d["uscite"]
+                text = (
+                    f"{_MESI[d['mese'] - 1]}\n"
+                    f"Entrate: {d['entrate']:,.2f}\n"
+                    f"Uscite: {d['uscite']:,.2f}\n"
+                    f"Saldo: {saldo:,.2f}"
+                )
+                self._ann_barre.set_text(text)
+                self._ann_barre.xy = (event.xdata, event.ydata)
+                self._ann_barre.set_visible(True)
+                self._canvas_barre.draw_idle()
+                return
+
+        self._ann_barre.set_visible(False)
+        self._canvas_barre.draw_idle()
+
+    def _on_hover_donut(self, event) -> None:
+        if self._ann_donut is None or event.inaxes is None:
+            if self._ann_donut is not None:
+                self._ann_donut.set_visible(False)
+                self._canvas_donut.draw_idle()
+            return
+
+        total = sum(d["totale"] for d in self._donut_data)
+        for i, wedge in enumerate(self._donut_wedges):
+            if wedge.contains(event)[0]:
+                d = self._donut_data[i]
+                pct = d["totale"] / total * 100 if total else 0.0
+                text = f"{d['nome']}\n{d['totale']:,.2f}\n{pct:.1f}%"
+                self._ann_donut.set_text(text)
+                self._ann_donut.xy = (event.xdata, event.ydata)
+                self._ann_donut.set_visible(True)
+                self._canvas_donut.draw_idle()
+                return
+
+        self._ann_donut.set_visible(False)
+        self._canvas_donut.draw_idle()
+
+    def _on_hover_trend(self, event) -> None:
+        if self._ann_trend is None or event.inaxes is None or self._trend_line_corr is None:
+            if self._ann_trend is not None:
+                self._ann_trend.set_visible(False)
+                self._canvas_trend.draw_idle()
+            return
+
+        hit_corr, info_corr = self._trend_line_corr.contains(event)
+        hit_prec, info_prec = (
+            self._trend_line_prec.contains(event)
+            if self._trend_line_prec is not None
+            else (False, {})
+        )
+
+        if hit_corr:
+            idx = info_corr["ind"][0]
+            text = f"{_MESI[idx]}\n{self._anno}: {self._trend_corrente[idx]:,.2f}"
+            if self._trend_line_prec is not None:
+                text += f"\n{self._anno - 1}: {self._trend_precedente[idx]:,.2f}"
+            self._ann_trend.xy = (idx, self._trend_corrente[idx])
+        elif hit_prec:
+            idx = info_prec["ind"][0]
+            text = (
+                f"{_MESI[idx]}\n"
+                f"{self._anno}: {self._trend_corrente[idx]:,.2f}\n"
+                f"{self._anno - 1}: {self._trend_precedente[idx]:,.2f}"
+            )
+            self._ann_trend.xy = (idx, self._trend_precedente[idx])
+        else:
+            self._ann_trend.set_visible(False)
+            self._canvas_trend.draw_idle()
+            return
+
+        self._ann_trend.set_text(text)
+        self._ann_trend.set_visible(True)
+        self._canvas_trend.draw_idle()
+
+    def _draw_tabella(self, movimenti, valuta: str) -> None:
+        riepilogo = riepilogo_mensile(movimenti, self._anno)
+        mesi_rows = [r for r in riepilogo if "mese" in r]
+        footer_rows = [r for r in riepilogo if "tipo" in r]
+
+        self._table.setRowCount(len(mesi_rows) + len(footer_rows))
+
+        for i, row in enumerate(mesi_rows):
+            self._table.setItem(i, 0, QTableWidgetItem(_MESI_FULL[row["mese"] - 1]))
+            self._table.setItem(i, 1, _make_amount_item(valuta, row["entrate"]))
+            self._table.setItem(i, 2, _make_amount_item(valuta, row["uscite"]))
+
+            item_saldo = _make_amount_item(valuta, row["saldo"])
+            _color_item(item_saldo, row["saldo"])
+            self._table.setItem(i, 3, item_saldo)
+
+            if row["mese"] == 1:
+                self._table.setItem(i, 4, QTableWidgetItem("—"))
+            else:
+                item_delta = QTableWidgetItem(f"{row['delta']:+,.2f}")
+                _color_item(item_delta, row["delta"])
+                self._table.setItem(i, 4, item_delta)
+
+        for i, row in enumerate(footer_rows, start=len(mesi_rows)):
+            lbl = QTableWidgetItem(_TIPO_LABEL[row["tipo"]])
+            font = lbl.font()
+            font.setBold(True)
+            lbl.setFont(font)
+            self._table.setItem(i, 0, lbl)
+
+            self._table.setItem(i, 1, _make_amount_item(valuta, row["entrate"]))
+            self._table.setItem(i, 2, _make_amount_item(valuta, row["uscite"]))
+
+            item_saldo = _make_amount_item(valuta, row["saldo"])
+            _color_item(item_saldo, row["saldo"])
+            self._table.setItem(i, 3, item_saldo)
+
+            self._table.setItem(i, 4, QTableWidgetItem("—"))
+
+        if self._table.rowCount() > 0:
+            self._table.setFixedHeight(
+                self._table.horizontalHeader().height()
+                + self._table.rowHeight(0) * self._table.rowCount()
+                + 4
+            )
+
+    def _draw_pivot(self, movimenti, categorie: dict[int, str]) -> None:
+        self._draw_pivot_tipo(movimenti, categorie, "uscita", self._table_uscite)
+        self._draw_pivot_tipo(movimenti, categorie, "entrata", self._table_entrate)
+
+    def _draw_pivot_tipo(
+        self,
+        movimenti,
+        categorie: dict[int, str],
+        tipo: str,
+        table: QTableWidget,
+    ) -> None:
+        dati = pivot_categorie(movimenti, self._anno, tipo, categorie)
+        cat_list = dati["categorie"]
+        totali_mensili = dati["totali_mensili"]
+        media_mensile = dati["media_mensile"]
+        mediana_mensile = dati["mediana_mensile"]
+
+        footer = [
+            ("Totale", totali_mensili),
+            ("Media", media_mensile),
+            ("Mediana", mediana_mensile),
+        ]
+        table.setRowCount(len(cat_list) + len(footer))
+
+        for i, cat in enumerate(cat_list):
+            table.setItem(i, 0, QTableWidgetItem(cat["nome"]))
+            for j, val in enumerate(cat["mesi"]):
+                table.setItem(i, j + 1, QTableWidgetItem(_fmt_val(val)))
+            table.setItem(i, _IDX_TOTALE, QTableWidgetItem(f"{cat['totale_annuale']:,.2f}"))
+            table.setItem(i, _IDX_MEDIA, QTableWidgetItem(f"{cat['media']:,.2f}"))
+            table.setItem(i, _IDX_MEDIANA, QTableWidgetItem(f"{cat['mediana']:,.2f}"))
+
+        for k, (label, valori_mensili) in enumerate(footer):
+            i = len(cat_list) + k
+            lbl = QTableWidgetItem(label)
+            font = lbl.font()
+            font.setBold(True)
+            lbl.setFont(font)
+            table.setItem(i, 0, lbl)
+            for j, val in enumerate(valori_mensili):
+                table.setItem(i, j + 1, QTableWidgetItem(_fmt_val(val)))
+            table.setItem(i, _IDX_TOTALE, QTableWidgetItem("—"))
+            table.setItem(i, _IDX_MEDIA, QTableWidgetItem("—"))
+            table.setItem(i, _IDX_MEDIANA, QTableWidgetItem("—"))
+
+        _set_table_fixed_height(table)
 
     def _prev_year(self) -> None:
         self._anno -= 1

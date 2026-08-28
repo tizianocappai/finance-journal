@@ -29,7 +29,7 @@ class Sidebar(QWidget):
         layout.addWidget(header)
 
         # Personale group label
-        personale_label = QLabel("▼ Personale")
+        personale_label = QLabel("▼ Resoconto Personale")
         personale_label.setStyleSheet(
             "font-weight: bold; padding: 10px 12px 4px 12px; color: #555555;"
         )

@@ -3,6 +3,8 @@ from .dashboard import (
     breakdown_mensile,
     breakdown_categorie,
     trend_annuale,
+    riepilogo_mensile,
+    pivot_categorie,
 )
 
 __all__ = [
@@ -10,4 +12,6 @@ __all__ = [
     "breakdown_mensile",
     "breakdown_categorie",
     "trend_annuale",
+    "riepilogo_mensile",
+    "pivot_categorie",
 ]
