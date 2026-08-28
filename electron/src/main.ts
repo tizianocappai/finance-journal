@@ -1,6 +1,7 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import { initDatabase } from './db/index';
+import { registerLookupHandlers } from './ipc/index';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -29,13 +30,16 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  let db;
   try {
-    initDatabase();
+    db = initDatabase();
   } catch (err) {
     console.error('Failed to initialize database:', err);
     app.quit();
     return;
   }
+
+  registerLookupHandlers(ipcMain, db);
 
   try {
     createWindow();
