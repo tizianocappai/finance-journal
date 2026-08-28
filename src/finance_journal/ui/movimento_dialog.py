@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QDateEdit,
@@ -12,8 +12,10 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QInputDialog,
+    QLabel,
     QLineEdit,
     QRadioButton,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -24,8 +26,23 @@ from finance_journal.models.metodo_pagamento import MetodoPagamento
 from finance_journal.models.movimento import Movimento
 from finance_journal.repositories.categoria import CategoriaRepository
 from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
+from finance_journal.ui import theme as th
 
 _SENTINEL = "__new__"
+
+
+def _make_error_label() -> QLabel:
+    p = th.current_palette()
+    lbl = QLabel("")
+    lbl.setVisible(False)
+    lbl.setStyleSheet(f"color: {p.danger}; font-size: {th.FONT_XS}; margin-top: 1px;")
+    return lbl
+
+
+def _set_field_invalid(widget: QWidget, invalid: bool) -> None:
+    widget.setProperty("invalid", invalid)
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
 
 
 class MovimentoDialog(QDialog):
@@ -48,9 +65,21 @@ class MovimentoDialog(QDialog):
 
         self.setWindowTitle("Modifica Movimento" if edit_mode else "Aggiungi Movimento")
         self.setModal(True)
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(400)
 
-        form = QFormLayout(self)
+        p = th.current_palette()
+        self.setStyleSheet(
+            f"QDialog {{ background-color: {p.surface}; border-radius: {th.RADIUS_MD}px; }}"
+        )
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(th.SPACING_LG, th.SPACING_LG, th.SPACING_LG, th.SPACING_MD)
+        outer.setSpacing(th.SPACING_SM)
+
+        form = QFormLayout()
+        form.setSpacing(th.SPACING_SM)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        outer.addLayout(form)
 
         # Data
         self._data_edit = QDateEdit()
@@ -82,9 +111,11 @@ class MovimentoDialog(QDialog):
         self._importo_spin.setMaximum(999_999.99)
         self._importo_spin.setDecimals(2)
         self._importo_spin.setValue(movimento.importo if edit_mode else 0.01)
+        self._importo_error = _make_error_label()
         form.addRow("Importo:", self._importo_spin)
+        form.addRow("", self._importo_error)
 
-        # Dettaglio — campo primario
+        # Dettaglio
         self._det_combo = QComboBox()
         self._det_combo.addItem("—", None)
         for d in self._dettagli:
@@ -92,32 +123,29 @@ class MovimentoDialog(QDialog):
         if edit_mode and movimento.dettaglio_id is not None:
             idx = self._det_combo.findData(movimento.dettaglio_id)
             self._det_combo.setCurrentIndex(max(0, idx))
-        # else rimane index 0 ("—")
         form.addRow("Dettaglio:", self._det_combo)
 
-        # Categoria — sempre visibile, derivata, stile muted
+        # Categoria
         self._prev_cat_idx = 0
         self._cat_combo = QComboBox()
         for c in categorie:
             self._cat_combo.addItem(c.nome, c.id)
         if cat_repo is not None:
             self._cat_combo.addItem("Nuova categoria…", _SENTINEL)
-        self._cat_combo.setStyleSheet("color: gray;")
 
+        self._cat_error = _make_error_label()
         if edit_mode:
-            # Pre-seleziona categoria salvata sul Movimento
             idx = next((i for i, c in enumerate(categorie) if c.id == movimento.categoria_id), 0)
             self._cat_combo.setCurrentIndex(idx)
             self._prev_cat_idx = idx
-        # else: cat rimane index 0; _on_det_changed autofill dopo connect
 
         self._cat_combo.currentIndexChanged.connect(self._on_cat_idx_changed)
         self._cat_combo.activated.connect(self._on_cat_activated)
         form.addRow("Categoria:", self._cat_combo)
+        form.addRow("", self._cat_error)
 
         # Connette dettaglio DOPO cat_combo pronto
         self._det_combo.currentIndexChanged.connect(self._on_det_changed)
-        # In modalità aggiungi: autofill iniziale se non "—"
         if not edit_mode:
             self._autofill_categoria()
 
@@ -128,6 +156,7 @@ class MovimentoDialog(QDialog):
             self._met_combo.addItem(m.nome, m.id)
         if met_repo is not None:
             self._met_combo.addItem("Nuovo metodo…", _SENTINEL)
+        self._met_error = _make_error_label()
         if edit_mode:
             idx = next((i for i, m in enumerate(metodi) if m.id == movimento.metodo_id), 0)
             self._met_combo.setCurrentIndex(idx)
@@ -135,6 +164,16 @@ class MovimentoDialog(QDialog):
         self._met_combo.currentIndexChanged.connect(self._on_met_idx_changed)
         self._met_combo.activated.connect(self._on_met_activated)
         form.addRow("Metodo:", self._met_combo)
+        form.addRow("", self._met_error)
+
+        # Validazione su blur — tutti i widget sono ora pronti
+        self._importo_spin.editingFinished.connect(self._validate_importo)
+        self._cat_combo.currentIndexChanged.connect(
+            lambda _: self._validate_categoria() if self._cat_combo.currentData() != _SENTINEL else None
+        )
+        self._met_combo.currentIndexChanged.connect(
+            lambda _: self._validate_metodo() if self._met_combo.currentData() != _SENTINEL else None
+        )
 
         # Nota
         self._nota_edit = QLineEdit()
@@ -148,12 +187,11 @@ class MovimentoDialog(QDialog):
             QDialogButtonBox.StandardButton.Save
             | QDialogButtonBox.StandardButton.Cancel
         )
-        buttons.accepted.connect(self.accept)
+        buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
-        form.addRow(buttons)
+        outer.addWidget(buttons)
 
     def _autofill_categoria(self) -> None:
-        """Aggiorna categoria dalla categoria del Dettaglio selezionato, se non override manuale."""
         if self._cat_override:
             return
         det_id = self._det_combo.currentData()
@@ -168,7 +206,6 @@ class MovimentoDialog(QDialog):
             self._prev_cat_idx = cat_idx
 
     def _on_det_changed(self, _idx: int) -> None:
-        """Cambio Dettaglio: resetta override e autofill categoria."""
         self._cat_override = False
         self._autofill_categoria()
 
@@ -177,7 +214,6 @@ class MovimentoDialog(QDialog):
             self._prev_cat_idx = idx
 
     def _on_cat_activated(self, idx: int) -> None:
-        """Selezione manuale categoria: imposta override o crea nuova categoria."""
         if self._cat_combo.itemData(idx) == _SENTINEL:
             if self._cat_repo is None:
                 return
@@ -189,7 +225,6 @@ class MovimentoDialog(QDialog):
             sentinel_idx = self._cat_combo.count() - 1
             self._cat_combo.insertItem(sentinel_idx, cat.nome, cat.id)
             self._cat_combo.setCurrentIndex(sentinel_idx)
-        # Qualsiasi selezione confermata (categoria esistente o nuova) è override manuale
         self._cat_override = True
 
     def _on_met_idx_changed(self, idx: int) -> None:
@@ -207,6 +242,47 @@ class MovimentoDialog(QDialog):
         sentinel_idx = self._met_combo.count() - 1
         self._met_combo.insertItem(sentinel_idx, met.nome, met.id)
         self._met_combo.setCurrentIndex(sentinel_idx)
+
+    def _validate_importo(self) -> bool:
+        invalid = self._importo_spin.value() <= 0
+        _set_field_invalid(self._importo_spin, invalid)
+        self._importo_error.setText("L'importo deve essere maggiore di zero." if invalid else "")
+        self._importo_error.setVisible(invalid)
+        return not invalid
+
+    def _validate_categoria(self) -> bool:
+        cat_data = self._cat_combo.currentData()
+        invalid = cat_data is None or cat_data == _SENTINEL
+        _set_field_invalid(self._cat_combo, invalid)
+        self._cat_error.setText("Seleziona una categoria." if invalid else "")
+        self._cat_error.setVisible(invalid)
+        return not invalid
+
+    def _validate_metodo(self) -> bool:
+        met_data = self._met_combo.currentData()
+        invalid = met_data is None or met_data == _SENTINEL
+        _set_field_invalid(self._met_combo, invalid)
+        self._met_error.setText("Seleziona un metodo di pagamento." if invalid else "")
+        self._met_error.setVisible(invalid)
+        return not invalid
+
+    def _validate(self) -> bool:
+        results = [
+            self._validate_importo(),
+            self._validate_categoria(),
+            self._validate_metodo(),
+        ]
+        if not results[0]:
+            self._importo_spin.setFocus()
+        elif not results[1]:
+            self._cat_combo.setFocus()
+        elif not results[2]:
+            self._met_combo.setFocus()
+        return all(results)
+
+    def _on_accept(self) -> None:
+        if self._validate():
+            self.accept()
 
     def get_data(self) -> dict:
         qdate = self._data_edit.date()

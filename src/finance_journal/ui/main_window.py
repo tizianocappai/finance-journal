@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QWidget
 
 from finance_journal.db.connection import create_connection
@@ -12,6 +13,7 @@ from finance_journal.ui.impostazioni import ImpostazioniWidget
 from finance_journal.ui.movimenti import MovimentiWidget
 from finance_journal.ui.placeholder import PlaceholderWidget
 from finance_journal.ui.sidebar import Sidebar
+from finance_journal.ui.toast import Toast
 
 
 class MainWindow(QMainWindow):
@@ -63,10 +65,34 @@ class MainWindow(QMainWindow):
         self._dashboard.show()
         layout.addWidget(self._dashboard, stretch=1)
 
+        self._setup_shortcuts()
+
+    def _setup_shortcuts(self) -> None:
+        sc_new = QShortcut(QKeySequence("Ctrl+N"), self)
+        sc_new.activated.connect(self._on_shortcut_new)
+
+        sc_find = QShortcut(QKeySequence("Ctrl+F"), self)
+        sc_find.activated.connect(self._on_shortcut_find)
+
+    def _on_shortcut_new(self) -> None:
+        if self._current is not self._movimenti:
+            self._navigate_to("Movimenti")
+        self._movimenti.open_new_movement()
+
+    def _on_shortcut_find(self) -> None:
+        if self._current is not self._movimenti:
+            self._navigate_to("Movimenti")
+        self._movimenti.focus_search()
+
+    def _navigate_to(self, section: str) -> None:
+        self._sidebar.set_active_section(section)
+        self._on_section_changed(section)
+
     def _importa_csv(self) -> None:
         if run_import_csv_flow(self._conn, self):
             self._movimenti.refresh()
             self._dashboard.refresh()
+            Toast("Importazione CSV completata.", parent=self.centralWidget())
 
     def _esporta_csv(self) -> None:
         path, _ = QFileDialog.getSaveFileName(

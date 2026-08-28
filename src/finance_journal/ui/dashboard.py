@@ -31,6 +31,7 @@ from finance_journal.aggregation.dashboard import (
 from finance_journal.repositories.categoria import CategoriaRepository
 from finance_journal.repositories.impostazioni import ImpostazioniRepository
 from finance_journal.repositories.movimento import MovimentoRepository
+from finance_journal.ui import theme as th
 
 _MESI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
          "Lug", "Ago", "Set", "Ott", "Nov", "Dic"]
@@ -40,17 +41,15 @@ _MESI_FULL = [
     "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
 ]
 
-_COLOR_POSITIVO = QColor("#2e7d32")
-_COLOR_NEGATIVO = QColor("#c62828")
-
 _TIPO_LABEL = {"totale": "Totale", "media": "Media", "mediana": "Mediana"}
 
 
 def _color_item(item: QTableWidgetItem, value: float) -> None:
+    p = th.current_palette()
     if value > 0:
-        item.setForeground(_COLOR_POSITIVO)
+        item.setForeground(QColor(p.success))
     elif value < 0:
-        item.setForeground(_COLOR_NEGATIVO)
+        item.setForeground(QColor(p.danger))
 
 
 _PIVOT_HEADERS = ["Categoria"] + _MESI + ["Totale", "Media", "Mediana"]
@@ -90,22 +89,35 @@ def _set_table_fixed_height(table: QTableWidget) -> None:
 
 
 class _KpiTile(QFrame):
-    def __init__(self, label: str, parent: QWidget | None = None) -> None:
+    def __init__(self, label: str, bg_attr: str, value_color_attr: str | None = None,
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._bg_attr = bg_attr
+        self._value_color_attr = value_color_attr
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setStyleSheet(
-            "QFrame { background: #f5f5f5; border-radius: 8px; }"
-        )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(4)
 
-        lbl = QLabel(label)
-        lbl.setStyleSheet("color: #777; font-size: 11px;")
+        self._lbl = QLabel(label)
         self._value = QLabel("—")
-        self._value.setStyleSheet("font-size: 20px; font-weight: bold;")
-        layout.addWidget(lbl)
+        layout.addWidget(self._lbl)
         layout.addWidget(self._value)
+        self._apply_theme()
+
+    def _apply_theme(self) -> None:
+        p = th.current_palette()
+        bg = getattr(p, self._bg_attr)
+        self.setStyleSheet(
+            f"QFrame {{ background-color: {bg}; border-radius: {th.RADIUS_MD}px;"
+            f" border: 1px solid {p.border}; }}"
+        )
+        self._lbl.setStyleSheet(f"color: {p.muted}; font-size: {th.FONT_SM};")
+        value_color = getattr(p, self._value_color_attr) if self._value_color_attr else p.text
+        self._value.setStyleSheet(
+            f"font-size: {th.FONT_XL}; font-weight: bold; color: {value_color};"
+        )
 
     def set_value(self, text: str) -> None:
         self._value.setText(text)
@@ -172,10 +184,10 @@ class DashboardWidget(QWidget):
         # KPI tiles
         kpi_row = QHBoxLayout()
         kpi_row.setSpacing(10)
-        self._kpi_entrate = _KpiTile("Totale Entrate")
-        self._kpi_uscite = _KpiTile("Totale Uscite")
-        self._kpi_saldo = _KpiTile("Saldo Netto")
-        self._kpi_rossi = _KpiTile("Mesi in Rosso")
+        self._kpi_entrate = _KpiTile("Totale Entrate", "kpi_entrate_bg", "success")
+        self._kpi_uscite = _KpiTile("Totale Uscite", "kpi_uscite_bg", "danger")
+        self._kpi_saldo = _KpiTile("Saldo Netto", "kpi_saldo_bg", "primary")
+        self._kpi_rossi = _KpiTile("Mesi in Rosso", "surface")
         for tile in (self._kpi_entrate, self._kpi_uscite, self._kpi_saldo, self._kpi_rossi):
             kpi_row.addWidget(tile)
         root.addLayout(kpi_row)
@@ -262,26 +274,52 @@ class DashboardWidget(QWidget):
         data = breakdown_mensile(movimenti, self._anno)
         entrate = [d["entrate"] for d in data]
         uscite = [d["uscite"] for d in data]
+        p = th.current_palette()
 
         self._fig_barre.clear()
         ax = self._fig_barre.add_subplot(111)
+        ax.set_facecolor(p.surface)
+        self._fig_barre.patch.set_facecolor(p.surface)
         x = list(range(12))
         w = 0.35
-        bc_e = ax.bar([i - w / 2 for i in x], entrate, width=w, label="Entrate", color="#4CAF50")
-        bc_u = ax.bar([i + w / 2 for i in x], uscite, width=w, label="Uscite", color="#F44336")
+        bc_e = ax.bar(
+            [i - w / 2 for i in x], entrate, width=w,
+            label="Entrate", color=p.chart_entrate,
+            hatch="", edgecolor=p.surface,
+        )
+        bc_u = ax.bar(
+            [i + w / 2 for i in x], uscite, width=w,
+            label="Uscite", color=p.chart_uscite,
+            hatch="//", edgecolor=p.surface,
+        )
+        for rect, val in zip(bc_e.patches, entrate):
+            if val > 0:
+                ax.text(
+                    rect.get_x() + rect.get_width() / 2, rect.get_height(),
+                    f"{val:,.0f}", ha="center", va="bottom", fontsize=6, color=p.text,
+                )
+        for rect, val in zip(bc_u.patches, uscite):
+            if val > 0:
+                ax.text(
+                    rect.get_x() + rect.get_width() / 2, rect.get_height(),
+                    f"{val:,.0f}", ha="center", va="bottom", fontsize=6, color=p.text,
+                )
         ax.set_xticks(x)
-        ax.set_xticklabels(_MESI, fontsize=8)
-        ax.tick_params(axis="y", labelsize=8)
-        ax.legend(fontsize=8)
-        ax.set_title("Entrate / Uscite mensili", fontsize=10)
+        ax.set_xticklabels(_MESI, fontsize=8, color=p.text)
+        ax.tick_params(axis="y", labelsize=8, colors=p.text)
+        ax.tick_params(axis="x", colors=p.text)
+        for spine in ax.spines.values():
+            spine.set_color(p.border)
+        ax.legend(fontsize=8, facecolor=p.surface, edgecolor=p.border, labelcolor=p.text)
+        ax.set_title("Entrate / Uscite mensili", fontsize=10, color=p.text)
 
         self._barre_data = data
         self._barre_rects_e = bc_e.patches
         self._barre_rects_u = bc_u.patches
         self._ann_barre = ax.annotate(
             "", xy=(0, 0), xytext=(10, 10), textcoords="offset points",
-            bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#aaaaaa", alpha=0.9),
-            fontsize=8, visible=False,
+            bbox=dict(boxstyle="round,pad=0.4", fc=p.surface, ec=p.border, alpha=0.9),
+            fontsize=8, visible=False, color=p.text,
         )
 
         if self._cid_barre is not None:
@@ -293,8 +331,11 @@ class DashboardWidget(QWidget):
 
     def _draw_donut(self, movimenti, categorie: dict[int, str]) -> None:
         data = breakdown_categorie(movimenti, self._anno, categorie)
+        p = th.current_palette()
         self._fig_donut.clear()
         ax = self._fig_donut.add_subplot(111)
+        ax.set_facecolor(p.surface)
+        self._fig_donut.patch.set_facecolor(p.surface)
         if data:
             labels = [d["nome"] for d in data]
             sizes = [d["totale"] for d in data]
@@ -308,22 +349,26 @@ class DashboardWidget(QWidget):
             )
             for t in autotexts:
                 t.set_fontsize(7)
-            ax.legend(wedges, labels, loc="center left",
-                      bbox_to_anchor=(1, 0.5), fontsize=7)
+                t.set_color(p.text)
+            ax.legend(
+                wedges, labels, loc="center left",
+                bbox_to_anchor=(1, 0.5), fontsize=7,
+                facecolor=p.surface, edgecolor=p.border, labelcolor=p.text,
+            )
             self._donut_wedges = list(wedges)
             self._donut_data = data
         else:
-            ax.text(0, 0, "Nessun dato", ha="center", va="center", fontsize=10)
+            ax.text(0, 0, "Nessun dato", ha="center", va="center", fontsize=10, color=p.muted)
             ax.set_xlim(-1, 1)
             ax.set_ylim(-1, 1)
             self._donut_wedges = []
             self._donut_data = []
-        ax.set_title("Uscite per Categoria", fontsize=10)
+        ax.set_title("Uscite per Categoria", fontsize=10, color=p.text)
 
         self._ann_donut = ax.annotate(
             "", xy=(0, 0), xytext=(10, 10), textcoords="offset points",
-            bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#aaaaaa", alpha=0.9),
-            fontsize=8, visible=False,
+            bbox=dict(boxstyle="round,pad=0.4", fc=p.surface, ec=p.border, alpha=0.9),
+            fontsize=8, visible=False, color=p.text,
         )
 
         if self._cid_donut is not None:
@@ -337,21 +382,30 @@ class DashboardWidget(QWidget):
         trend = trend_annuale(movimenti, self._anno)
         corrente = [d["entrate"] - d["uscite"] for d in trend["corrente"]]
         precedente = [d["entrate"] - d["uscite"] for d in trend["precedente"]]
+        p = th.current_palette()
 
         self._fig_trend.clear()
         ax = self._fig_trend.add_subplot(111)
-        line_corr, = ax.plot(_MESI, corrente, marker="o", markersize=4,
-                             label=str(self._anno), color="#2196F3", linewidth=1.5)
+        ax.set_facecolor(p.surface)
+        self._fig_trend.patch.set_facecolor(p.surface)
+        line_corr, = ax.plot(
+            _MESI, corrente, marker="o", markersize=4,
+            label=str(self._anno), color=p.chart_saldo, linewidth=1.5,
+        )
         line_prec = None
         has_prec = any(v != 0 for v in precedente)
         if has_prec:
-            line_prec, = ax.plot(_MESI, precedente, marker="o", markersize=4,
-                                 label=str(self._anno - 1), color="#9E9E9E",
-                                 linewidth=1.5, linestyle="--")
-        ax.axhline(0, color="#cccccc", linewidth=0.8)
-        ax.tick_params(axis="both", labelsize=8)
-        ax.legend(fontsize=8)
-        ax.set_title("Trend mensile (saldo)", fontsize=10)
+            line_prec, = ax.plot(
+                _MESI, precedente, marker="s", markersize=4,
+                label=str(self._anno - 1), color=p.chart_precedente,
+                linewidth=1.5, linestyle="--",
+            )
+        ax.axhline(0, color=p.border, linewidth=0.8)
+        ax.tick_params(axis="both", labelsize=8, colors=p.text)
+        for spine in ax.spines.values():
+            spine.set_color(p.border)
+        ax.legend(fontsize=8, facecolor=p.surface, edgecolor=p.border, labelcolor=p.text)
+        ax.set_title("Trend mensile (saldo)", fontsize=10, color=p.text)
 
         self._trend_corrente = corrente
         self._trend_precedente = precedente
@@ -359,8 +413,8 @@ class DashboardWidget(QWidget):
         self._trend_line_prec = line_prec
         self._ann_trend = ax.annotate(
             "", xy=(0, 0), xytext=(10, 10), textcoords="offset points",
-            bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#aaaaaa", alpha=0.9),
-            fontsize=8, visible=False,
+            bbox=dict(boxstyle="round,pad=0.4", fc=p.surface, ec=p.border, alpha=0.9),
+            fontsize=8, visible=False, color=p.text,
         )
 
         if self._cid_trend is not None:

@@ -37,31 +37,7 @@ from finance_journal.repositories.categoria import CategoriaRepository
 from finance_journal.repositories.dettaglio import DettaglioRepository
 from finance_journal.repositories.impostazioni import ImpostazioniRepository
 from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
-
-_TEMA_SCURO = """
-QWidget { background-color: #2b2b2b; color: #f0f0f0; }
-QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit {
-    background-color: #3c3f41; color: #f0f0f0; border: 1px solid #555;
-}
-QPushButton {
-    background-color: #4c5052; color: #f0f0f0;
-    border: 1px solid #666; padding: 4px 8px;
-}
-QPushButton:hover { background-color: #5c6164; }
-QGroupBox { color: #f0f0f0; border: 1px solid #555; margin-top: 6px; }
-QGroupBox::title { subcontrol-origin: margin; left: 8px; }
-"""
-
-_TEMA_CHIARO = """
-QWidget { background-color: #ffffff; color: #000000; }
-QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit {
-    background-color: #ffffff; color: #000000; border: 1px solid #ccc;
-}
-QPushButton { background-color: #f0f0f0; color: #000000; border: 1px solid #bbb; padding: 4px 8px; }
-QPushButton:hover { background-color: #e0e0e0; }
-QGroupBox { color: #000000; border: 1px solid #ccc; margin-top: 6px; }
-QGroupBox::title { subcontrol-origin: margin; left: 8px; }
-"""
+from finance_journal.ui import theme as th
 
 
 class ImpostazioniWidget(QWidget):
@@ -536,9 +512,5 @@ def _applica_tema_app(tema: str) -> None:
     app = QApplication.instance()
     if app is None:
         return
-    if tema == "scuro":
-        app.setStyleSheet(_TEMA_SCURO)
-    elif tema == "chiaro":
-        app.setStyleSheet(_TEMA_CHIARO)
-    else:
-        app.setStyleSheet("")
+    th.set_tema(tema)
+    app.setStyleSheet(th.get_stylesheet(tema))
