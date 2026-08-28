@@ -14,6 +14,12 @@ import {
   updateMovimento,
   deleteMovimento,
 } from './movimenti';
+import {
+  getDashboardKPI,
+  getSerieMensili,
+  getBreakdownCategorie,
+  getTrendYoY,
+} from './dashboard';
 import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
 
 export function registerLookupHandlers(
@@ -58,5 +64,18 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('movimenti:delete', (_e, { id }: { id: number }) =>
     deleteMovimento(db, id),
+  );
+
+  ipcMain.handle('dashboard:kpi', (_e, { anno }: { anno: number }) =>
+    getDashboardKPI(db, anno),
+  );
+  ipcMain.handle('dashboard:serie-mensili', (_e, { anno }: { anno: number }) =>
+    getSerieMensili(db, anno),
+  );
+  ipcMain.handle('dashboard:breakdown-categorie', (_e, { anno }: { anno: number }) =>
+    getBreakdownCategorie(db, anno),
+  );
+  ipcMain.handle('dashboard:trend-yoy', (_e, { anno }: { anno: number }) =>
+    getTrendYoY(db, anno),
   );
 }

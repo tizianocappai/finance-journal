@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './ipc/types';
 
+
 try {
   contextBridge.exposeInMainWorld('electronAPI', {
     categorie: {
@@ -32,6 +33,13 @@ try {
         ipcRenderer.invoke('movimenti:update', { id, ...data }),
       delete: (id: number) =>
         ipcRenderer.invoke('movimenti:delete', { id }),
+    },
+    dashboard: {
+      kpi: (anno: number) => ipcRenderer.invoke('dashboard:kpi', { anno }),
+      serieMensili: (anno: number) => ipcRenderer.invoke('dashboard:serie-mensili', { anno }),
+      breakdownCategorie: (anno: number) =>
+        ipcRenderer.invoke('dashboard:breakdown-categorie', { anno }),
+      trendYoY: (anno: number) => ipcRenderer.invoke('dashboard:trend-yoy', { anno }),
     },
   });
 } catch (err) {

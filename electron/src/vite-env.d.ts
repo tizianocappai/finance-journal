@@ -9,6 +9,10 @@ import type {
   MovimentoFilters,
   MovimentoCreate,
   MovimentoUpdate,
+  DashboardKPI,
+  SerieMensile,
+  BreakdownCategoria,
+  TrendYoY,
 } from './ipc/types';
 
 declare global {
@@ -35,6 +39,12 @@ declare global {
         create: (data: MovimentoCreate) => Promise<Movimento>;
         update: (id: number, data: MovimentoUpdate) => Promise<Movimento>;
         delete: (id: number) => Promise<void>;
+      };
+      dashboard: {
+        kpi: (anno: number) => Promise<DashboardKPI>;
+        serieMensili: (anno: number) => Promise<SerieMensile[]>;
+        breakdownCategorie: (anno: number) => Promise<BreakdownCategoria[]>;
+        trendYoY: (anno: number) => Promise<TrendYoY>;
       };
     };
   }

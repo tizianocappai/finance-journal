@@ -68,3 +68,38 @@ export interface MovimentoUpdate {
   metodo_id?: number | null;
   dettaglio_id?: number | null;
 }
+
+export interface DashboardKPI {
+  entrate: number;
+  uscite: number;
+  saldo: number;
+  mesi_in_rosso: number;
+}
+
+export interface SerieMensile {
+  mese: number;
+  nome_mese: string;
+  entrate: number;
+  uscite: number;
+}
+
+export interface BreakdownCategoria {
+  categoria_id: number | null;
+  categoria_nome: string;
+  totale: number;
+}
+
+export interface TrendYoY {
+  entrate_anno_corrente: number;
+  entrate_anno_precedente: number;
+  uscite_anno_corrente: number;
+  uscite_anno_precedente: number;
+  saldo_anno_corrente: number;
+  saldo_anno_precedente: number;
+  mesi_in_rosso_anno_corrente: number;
+  mesi_in_rosso_anno_precedente: number;
+  delta_entrate_pct: number | null;
+  delta_uscite_pct: number | null;
+  delta_saldo_pct: number | null;
+  delta_mesi_in_rosso: number | null;
+}

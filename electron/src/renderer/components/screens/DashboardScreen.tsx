@@ -1,77 +1,320 @@
-import { useMemo } from 'react';
-import { AgGridReact } from 'ag-grid-react';
+import { useEffect, useMemo } from 'react';
 import { AgCharts } from 'ag-charts-react';
-import type { ColDef } from 'ag-grid-community';
-import type { AgChartOptions } from 'ag-charts-community';
+import type { AgChartOptions, AgChartTheme } from 'ag-charts-community';
+import { TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, PieChart } from 'lucide-react';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
-import { getAgGridTheme, getAgChartsTheme } from '@/lib/ag-theme';
-interface SampleRow {
-  data: string;
-  descrizione: string;
-  importo: number;
-  categoria: string;
+import { useDashboardStore } from '@/stores/dashboard';
+
+const COLOR_ENTRATE = '#22c55e';
+const COLOR_USCITE = '#ef4444';
+
+const DONUT_COLORS = [
+  '#3b82f6',
+  '#f59e0b',
+  '#8b5cf6',
+  '#06b6d4',
+  '#f97316',
+  '#ec4899',
+  '#84cc16',
+  '#14b8a6',
+];
+
+const EURO_FMT = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const EURO_FMT_DEC = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
+
+function formatEuro(v: number): string {
+  return Math.abs(v) >= 1000 ? EURO_FMT.format(v) : EURO_FMT_DEC.format(v);
 }
 
-const SAMPLE_ROW_DATA: SampleRow[] = [
-  { data: '2026-08-01', descrizione: 'Spesa supermercato', importo: -85.4, categoria: 'Alimentari' },
-  { data: '2026-08-05', descrizione: 'Stipendio', importo: 2400, categoria: 'Entrate' },
-  { data: '2026-08-10', descrizione: 'Bolletta luce', importo: -62.0, categoria: 'Utenze' },
-];
+function buildBarTheme(isDark: boolean): AgChartTheme {
+  return {
+    baseTheme: isDark ? 'ag-default-dark' : 'ag-default',
+    palette: {
+      fills: [COLOR_ENTRATE, COLOR_USCITE],
+      strokes: [COLOR_ENTRATE, COLOR_USCITE],
+    },
+  };
+}
 
-const COL_DEFS: ColDef<SampleRow>[] = [
-  { field: 'data', flex: 1 },
-  { field: 'descrizione', flex: 2 },
-  { field: 'categoria', flex: 1 },
-  { field: 'importo', flex: 1, type: 'numericColumn' },
-];
+function buildDonutTheme(isDark: boolean): AgChartTheme {
+  return {
+    baseTheme: isDark ? 'ag-default-dark' : 'ag-default',
+    palette: {
+      fills: DONUT_COLORS,
+      strokes: DONUT_COLORS,
+    },
+  };
+}
 
-const CHART_DATA = [
-  { mese: 'Giu', entrate: 2400, uscite: 1800 },
-  { mese: 'Lug', entrate: 2400, uscite: 2100 },
-  { mese: 'Ago', entrate: 2600, uscite: 1950 },
-];
+interface TrendBadgeProps {
+  pct: number | null;
+  invert?: boolean;
+}
+
+function TrendBadge({ pct, invert = false }: TrendBadgeProps) {
+  if (pct === null) return <span className="text-xs text-muted-foreground">—</span>;
+
+  const positive = invert ? pct < 0 : pct > 0;
+  const neutral = pct === 0;
+  const abs = Math.abs(pct).toFixed(1);
+
+  const colorCls = neutral
+    ? 'text-muted-foreground'
+    : positive
+    ? 'text-green-600 dark:text-green-400'
+    : 'text-red-600 dark:text-red-400';
+
+  const Icon = neutral ? Minus : positive ? TrendingUp : TrendingDown;
+
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${colorCls}`}>
+      <Icon size={12} aria-hidden />
+      {pct > 0 ? '+' : ''}{abs}% vs anno prec.
+    </span>
+  );
+}
+
+interface KpiTileProps {
+  label: string;
+  value: number;
+  colorCls?: string;
+  trendPct: number | null;
+  invertTrend?: boolean;
+}
+
+function KpiTile({ label, value, colorCls, trendPct, invertTrend }: KpiTileProps) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className={`text-2xl font-semibold tabular-nums ${colorCls ?? 'text-foreground'}`}>
+        {formatEuro(value)}
+      </span>
+      <TrendBadge pct={trendPct} invert={invertTrend} />
+    </div>
+  );
+}
+
+interface MesiRossoTileProps {
+  count: number;
+  delta: number | null;
+}
+
+function MesiRossoTile({ count, delta }: MesiRossoTileProps) {
+  const deltaLabel =
+    delta === null ? null : delta === 0 ? (
+      <span className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground">
+        <Minus size={12} aria-hidden />
+        invariato
+      </span>
+    ) : delta > 0 ? (
+      <span className="inline-flex items-center gap-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+        <TrendingUp size={12} aria-hidden />+{delta} vs anno prec.
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-600 dark:text-green-400">
+        <TrendingDown size={12} aria-hidden />{delta} vs anno prec.
+      </span>
+    );
+
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4">
+      <span className="text-xs font-medium text-muted-foreground">Mesi in rosso</span>
+      <span
+        className={`text-2xl font-semibold tabular-nums ${
+          count > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'
+        }`}
+      >
+        {count}
+      </span>
+      {deltaLabel ?? (
+        <span className="text-xs text-muted-foreground">
+          mese{count !== 1 ? 'i' : ''} con saldo negativo
+        </span>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ anno }: { anno: number }) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col items-center justify-center gap-3 py-24 text-center"
+    >
+      <PieChart size={40} className="text-muted-foreground" aria-hidden />
+      <p className="text-sm font-medium text-foreground">Nessun movimento nel {anno}</p>
+      <p className="text-xs text-muted-foreground">
+        Aggiungi movimenti nella sezione Movimenti per vedere la dashboard.
+      </p>
+    </div>
+  );
+}
+
+interface YearNavProps {
+  anno: number;
+  onPrev: () => void;
+  onNext: () => void;
+}
+
+function YearNav({ anno, onPrev, onNext }: YearNavProps) {
+  return (
+    <div className="flex items-center gap-2" aria-label="Navigatore anno">
+      <button
+        onClick={onPrev}
+        aria-label="Anno precedente"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        <ChevronLeft size={16} aria-hidden />
+      </button>
+      <span className="min-w-12 text-center text-sm font-semibold tabular-nums text-foreground">
+        {anno}
+      </span>
+      <button
+        onClick={onNext}
+        aria-label="Anno successivo"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        <ChevronRight size={16} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+function saldoColor(saldo: number): string {
+  if (saldo > 0) return 'text-green-600 dark:text-green-400';
+  if (saldo < 0) return 'text-red-600 dark:text-red-400';
+  return 'text-foreground';
+}
 
 export default function DashboardScreen() {
   const { theme } = useThemeStore();
   const isDark = getResolvedTheme(theme) === 'dark';
 
-  const gridTheme = useMemo(() => getAgGridTheme(isDark), [isDark]);
+  const { anno, kpi, serieMensili, breakdownCategorie, trend, loading, error, fetch, setAnno } =
+    useDashboardStore();
 
-  const chartOptions = useMemo<AgChartOptions>(
-    () => ({
-      theme: getAgChartsTheme(isDark),
-      data: CHART_DATA,
-      series: [
-        { type: 'bar', xKey: 'mese', yKey: 'entrate', yName: 'Entrate' },
-        { type: 'bar', xKey: 'mese', yKey: 'uscite', yName: 'Uscite' },
-      ],
-    }),
-    [isDark],
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  const hasData = kpi !== null && (kpi.entrate > 0 || kpi.uscite > 0);
+
+  const barOptions = useMemo(
+    () =>
+      ({
+        theme: buildBarTheme(isDark),
+        data: serieMensili,
+        series: [
+          { type: 'bar', xKey: 'nome_mese', yKey: 'entrate', yName: 'Entrate' },
+          { type: 'bar', xKey: 'nome_mese', yKey: 'uscite', yName: 'Uscite' },
+        ],
+        legend: { position: 'bottom' },
+      }) as AgChartOptions,
+    [isDark, serieMensili],
+  );
+
+  const donutOptions = useMemo(
+    () =>
+      ({
+        theme: buildDonutTheme(isDark),
+        data: breakdownCategorie,
+        series: [
+          {
+            type: 'donut',
+            angleKey: 'totale',
+            calloutLabelKey: 'categoria_nome',
+            innerRadiusRatio: 0.6,
+          },
+        ],
+        legend: { position: 'right' },
+      }) as AgChartOptions,
+    [isDark, breakdownCategorie],
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <section aria-labelledby="grid-heading">
-        <h2 id="grid-heading" className="mb-3 text-sm font-medium text-muted-foreground">
-          Ultimi movimenti
-        </h2>
-        <div className="h-52 w-full rounded-lg border border-border overflow-hidden">
-          <AgGridReact<SampleRow>
-            theme={gridTheme}
-            rowData={SAMPLE_ROW_DATA}
-            columnDefs={COL_DEFS}
-          />
-        </div>
-      </section>
+    <div className="flex flex-col gap-6" aria-busy={loading}>
+      {/* Header: navigatore anno */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-muted-foreground">Anno finanziario</h2>
+        <YearNav
+          anno={anno}
+          onPrev={() => setAnno(anno - 1)}
+          onNext={() => setAnno(anno + 1)}
+        />
+      </div>
 
-      <section aria-labelledby="chart-heading">
-        <h2 id="chart-heading" className="mb-3 text-sm font-medium text-muted-foreground">
-          Andamento mensile
-        </h2>
-        <div className="h-64 w-full rounded-lg border border-border overflow-hidden">
-          <AgCharts options={chartOptions} />
+      {loading && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Caricamento KPI">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-lg border border-border bg-card" />
+          ))}
         </div>
-      </section>
+      )}
+
+      {!loading && error && (
+        <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+          Errore nel caricamento della dashboard: {error}
+        </div>
+      )}
+
+      {!loading && !error && !hasData && <EmptyState anno={anno} />}
+
+      {!loading && !error && hasData && kpi && (
+        <>
+          {/* KPI tiles */}
+          <section aria-labelledby="kpi-heading">
+            <h3 id="kpi-heading" className="sr-only">KPI annuali</h3>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <KpiTile
+                label="Entrate"
+                value={kpi.entrate}
+                colorCls="text-green-600 dark:text-green-400"
+                trendPct={trend?.delta_entrate_pct ?? null}
+              />
+              <KpiTile
+                label="Uscite"
+                value={kpi.uscite}
+                colorCls="text-red-600 dark:text-red-400"
+                trendPct={trend?.delta_uscite_pct ?? null}
+                invertTrend
+              />
+              <KpiTile
+                label="Saldo"
+                value={kpi.saldo}
+                colorCls={saldoColor(kpi.saldo)}
+                trendPct={trend?.delta_saldo_pct ?? null}
+              />
+              <MesiRossoTile
+                count={kpi.mesi_in_rosso}
+                delta={trend?.delta_mesi_in_rosso ?? null}
+              />
+            </div>
+          </section>
+
+          {/* Grafici */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <section aria-labelledby="bar-heading" className="lg:col-span-2">
+              <h3 id="bar-heading" className="mb-3 text-sm font-medium text-muted-foreground">
+                Andamento mensile
+              </h3>
+              <div className="h-64 w-full rounded-lg border border-border overflow-hidden">
+                <AgCharts options={barOptions} style={{ height: '100%' }} />
+              </div>
+            </section>
+
+            {breakdownCategorie.length > 0 && (
+              <section aria-labelledby="donut-heading">
+                <h3 id="donut-heading" className="mb-3 text-sm font-medium text-muted-foreground">
+                  Uscite per categoria
+                </h3>
+                <div className="h-64 w-full rounded-lg border border-border overflow-hidden">
+                  <AgCharts options={donutOptions} style={{ height: '100%' }} />
+                </div>
+              </section>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
