@@ -29,6 +29,17 @@ Valore dichiarato dall'utente come punto di partenza contabile, associato a una 
 **Mese in Rosso**
 Mese in cui il totale Uscite supera il totale Entrate (saldo mensile negativo).
 
+## Struttura dell'app — Electron
+
+**Main Process**
+Processo Node.js con accesso completo al filesystem e alle API native di Electron. Gestisce: accesso al DB (via `better-sqlite3`), operazioni su file (export CSV/JSON, import DB), path utente, lifecycle dell'app. Non ha accesso al DOM.
+
+**Renderer Process**
+Processo browser (Chromium) che esegue l'interfaccia React. Non ha accesso diretto al filesystem né a Node. Comunica con il Main Process esclusivamente tramite l'IPC Bridge.
+
+**IPC Bridge**
+Strato di comunicazione tra Renderer e Main Process. Esposto nel renderer via `contextBridge` (preload script). Organizzato in canali tipizzati flat (es. `movimenti:list`, `movimenti:create`). Il tipo di ogni canale è definito in un contratto TypeScript condiviso tra main e preload.
+
 ## Struttura dell'app
 
 **Sezione**
@@ -48,14 +59,13 @@ Vista aggregata di un Anno Finanziario per una Sezione. Mostra: KPI sintetici (t
 
 ## Distribuzione e packaging
 
-**Nome app distribuita**: Zero Budget
-**Bundle identifier**: `app.zerobudget`
-**Build tool**: Briefcase (BeeWare) — cross-platform by design; produce `.app`+`.dmg` su macOS, `.exe` su Windows, AppImage su Linux.
+**Nome app distribuita**: No Budget
+**Bundle identifier**: `app.nobudget`
+**Build tool**: Electron Forge + Vite plugin — cross-platform; produce `.app`+`.dmg` su macOS, `.exe` su Windows, AppImage su Linux.
 **Firma**: nessuna per ora. Gli utenti macOS devono fare clic destro → Apri → Apri comunque (workaround Gatekeeper documentato in INSTALL.md).
-**Icona**: simbolo `€` bianco su sfondo verde scuro `#1B5E20`, generata da script Python.
-**Distribuzione**: GitHub Releases — `.dmg` caricato manualmente a ogni release.
-**Python runtime**: Briefcase imballa il proprio Python (indipendente dal venv di sviluppo).
-**Target futuro**: Windows e Linux (stessa codebase, comandi Briefcase differenti).
+**Icona**: simbolo `€` bianco su sfondo verde scuro `#1B5E20`.
+**Distribuzione**: GitHub Releases — artefatti caricati manualmente a ogni release.
+**DB path**: `app.getPath('userData')` di Electron — equivalente cross-platform di `platformdirs`; stesso percorso OS dell'app Python.
 
 ## Regole di dominio
 

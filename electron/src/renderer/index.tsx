@@ -1,7 +1,10 @@
 import './index.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ModuleRegistry, AllCommunityModule } from 'ag-charts-community';
 import App from './App';
+
+ModuleRegistry.registerModules(AllCommunityModule);
 
 // Zero-flash: apply theme class synchronously before React mounts.
 // Zustand persist stores JSON as {"state":{"theme":"..."},"version":0}.

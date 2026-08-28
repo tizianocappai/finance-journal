@@ -277,6 +277,34 @@ QFrame#toast {{
     border: 1px solid {p.border};
     border-radius: {RADIUS_MD}px;
 }}
+QCalendarWidget QAbstractItemView {{
+    background-color: {p.surface};
+    color: {p.text};
+    selection-background-color: {p.primary};
+    selection-color: white;
+    alternate-background-color: {p.background};
+}}
+QCalendarWidget QAbstractItemView:disabled {{
+    color: {p.muted};
+}}
+QCalendarWidget QWidget#qt_calendar_navigationbar {{
+    background-color: {p.background};
+    color: {p.text};
+}}
+QCalendarWidget QToolButton {{
+    background-color: transparent;
+    color: {p.text};
+    border: none;
+}}
+QCalendarWidget QToolButton:hover {{
+    background-color: {p.sidebar_hover};
+    border-radius: {RADIUS_SM}px;
+}}
+QCalendarWidget QSpinBox {{
+    background-color: {p.surface};
+    color: {p.text};
+    border: 1px solid {p.border};
+}}
 """
 
 

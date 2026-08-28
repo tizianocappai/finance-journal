@@ -5,7 +5,7 @@ import sqlite3
 from collections.abc import Callable
 from datetime import date
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -33,6 +33,7 @@ from finance_journal.repositories.impostazioni import ImpostazioniRepository
 from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
 from finance_journal.repositories.movimento import MovimentoRepository
 from finance_journal.ui import theme as th
+from finance_journal.ui.icons import icon_pencil, icon_trash
 from finance_journal.ui.movimento_dialog import MovimentoDialog
 from finance_journal.ui.toast import Toast
 
@@ -172,7 +173,7 @@ class MovimentiWidget(QWidget):
         header = self._table.horizontalHeader()
         header.setStretchLastSection(False)
         header.setSectionResizeMode(len(_COLS) - 2, QHeaderView.ResizeMode.Stretch)
-        self._table.setColumnWidth(len(_COLS) - 1, 170)
+        self._table.setColumnWidth(len(_COLS) - 1, 76)
         self._table.verticalHeader().setVisible(False)
 
         self._empty_state = _EmptyState()
@@ -284,19 +285,29 @@ class MovimentiWidget(QWidget):
             self._table.setItem(row, 5, QTableWidgetItem(met_nome))
             self._table.setItem(row, 6, QTableWidgetItem(m.nota or ""))
 
+            p_col = th.current_palette()
             cell = QWidget()
             lay = QHBoxLayout(cell)
-            lay.setContentsMargins(2, 2, 2, 2)
+            lay.setContentsMargins(2, 1, 2, 1)
             lay.setSpacing(4)
-            btn_mod = QPushButton("Modifica")
+            lay.addStretch()
+            btn_mod = QPushButton()
+            btn_mod.setIcon(icon_pencil(p_col.text))
+            btn_mod.setIconSize(QSize(14, 14))
+            btn_mod.setFixedSize(28, 28)
+            btn_mod.setFlat(True)
+            btn_mod.setToolTip("Modifica")
             btn_mod.clicked.connect(lambda checked=False, r=row: self._on_modifica(r))
-            btn_del = QPushButton("Elimina")
-            btn_del.setProperty("danger", True)
-            btn_del.style().unpolish(btn_del)
-            btn_del.style().polish(btn_del)
+            btn_del = QPushButton()
+            btn_del.setIcon(icon_trash(p_col.danger))
+            btn_del.setIconSize(QSize(14, 14))
+            btn_del.setFixedSize(28, 28)
+            btn_del.setFlat(True)
+            btn_del.setToolTip("Elimina")
             btn_del.clicked.connect(lambda checked=False, r=row: self._on_elimina_riga(r))
             lay.addWidget(btn_mod)
             lay.addWidget(btn_del)
+            lay.addStretch()
             self._table.setCellWidget(row, len(_COLS) - 1, cell)
 
     def _refresh(self) -> None:
@@ -313,18 +324,8 @@ class MovimentiWidget(QWidget):
         Toast(message, parent=parent, undo_callback=undo_callback)
 
     def _restore_movimento(self, m: Movimento) -> None:
-        tipo = m.tipo.value if hasattr(m.tipo, "value") else m.tipo
         try:
-            self._repo_mov.create_movimento(
-                data=m.data,
-                tipo=tipo,
-                importo=m.importo,
-                categoria_id=m.categoria_id,
-                metodo_id=m.metodo_id,
-                sezione=_SEZIONE,
-                nota=m.nota,
-                dettaglio_id=m.dettaglio_id,
-            )
+            self._repo_mov.restore_movimento(m)
         except Exception:
             logger.exception("Errore nel ripristino del movimento")
 

@@ -87,6 +87,19 @@ class MovimentoRepository:
         self._conn.commit()
         logger.info("movimento #%d aggiornato", movimento_id)
 
+    def restore_movimento(self, m: "Movimento") -> None:
+        tipo = m.tipo.value if hasattr(m.tipo, "value") else m.tipo
+        sezione = m.sezione.value if hasattr(m.sezione, "value") else m.sezione
+        self._conn.execute(
+            """INSERT INTO movimenti
+               (id, data, tipo, importo, categoria_id, metodo_id, sezione, nota, dettaglio_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (m.id, m.data.isoformat(), tipo, m.importo,
+             m.categoria_id, m.metodo_id, sezione, m.nota, m.dettaglio_id),
+        )
+        self._conn.commit()
+        logger.info("movimento #%d ripristinato", m.id)
+
     def delete_movimento(self, movimento_id: int) -> None:
         self._conn.execute("DELETE FROM movimenti WHERE id = ?", (movimento_id,))
         self._conn.commit()

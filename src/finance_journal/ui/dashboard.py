@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -153,14 +154,27 @@ class DashboardWidget(QWidget):
         self.refresh()
 
     def _build_ui(self) -> None:
-        root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(12)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        outer.addWidget(scroll)
+
+        container = QWidget()
+        scroll.setWidget(container)
+
+        root = QVBoxLayout(container)
+        root.setContentsMargins(20, 20, 20, 24)
+        root.setSpacing(0)
 
         # Intestazione sezione
         titolo = QLabel("Resoconto Personale")
         titolo.setStyleSheet("font-size: 18px; font-weight: bold;")
         root.addWidget(titolo)
+        root.addSpacing(12)
 
         # Anno navigator
         nav = QHBoxLayout()
@@ -180,10 +194,11 @@ class DashboardWidget(QWidget):
         nav.addWidget(self._btn_next)
         nav.addStretch()
         root.addLayout(nav)
+        root.addSpacing(16)
 
         # KPI tiles
         kpi_row = QHBoxLayout()
-        kpi_row.setSpacing(10)
+        kpi_row.setSpacing(12)
         self._kpi_entrate = _KpiTile("Totale Entrate", "kpi_entrate_bg", "success")
         self._kpi_uscite = _KpiTile("Totale Uscite", "kpi_uscite_bg", "danger")
         self._kpi_saldo = _KpiTile("Saldo Netto", "kpi_saldo_bg", "primary")
@@ -191,36 +206,40 @@ class DashboardWidget(QWidget):
         for tile in (self._kpi_entrate, self._kpi_uscite, self._kpi_saldo, self._kpi_rossi):
             kpi_row.addWidget(tile)
         root.addLayout(kpi_row)
+        root.addSpacing(20)
 
         # Barre + Donut
         charts_row = QHBoxLayout()
-        charts_row.setSpacing(8)
+        charts_row.setSpacing(12)
 
-        self._fig_barre = Figure(figsize=(5, 3), tight_layout=True)
+        self._fig_barre = Figure(figsize=(5, 3.2), tight_layout=True)
         self._canvas_barre = FigureCanvasQTAgg(self._fig_barre)
         self._canvas_barre.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._canvas_barre.setMinimumHeight(220)
+        self._canvas_barre.setMinimumHeight(280)
         charts_row.addWidget(self._canvas_barre, stretch=3)
 
-        self._fig_donut = Figure(figsize=(4, 3), tight_layout=True)
+        self._fig_donut = Figure(figsize=(4, 3.2), tight_layout=True)
         self._canvas_donut = FigureCanvasQTAgg(self._fig_donut)
         self._canvas_donut.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._canvas_donut.setMinimumHeight(220)
+        self._canvas_donut.setMinimumHeight(280)
         charts_row.addWidget(self._canvas_donut, stretch=2)
 
         root.addLayout(charts_row)
+        root.addSpacing(12)
 
         # Trend
-        self._fig_trend = Figure(figsize=(10, 2.5), tight_layout=True)
+        self._fig_trend = Figure(figsize=(10, 2.8), tight_layout=True)
         self._canvas_trend = FigureCanvasQTAgg(self._fig_trend)
         self._canvas_trend.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._canvas_trend.setMinimumHeight(180)
+        self._canvas_trend.setMinimumHeight(220)
         root.addWidget(self._canvas_trend)
+        root.addSpacing(24)
 
         # Tabella riepilogo mensile
         lbl_tabella = QLabel("Riepilogo mensile")
         lbl_tabella.setStyleSheet("font-size: 14px; font-weight: bold;")
         root.addWidget(lbl_tabella)
+        root.addSpacing(6)
 
         self._table = QTableWidget()
         self._table.setColumnCount(5)
@@ -234,18 +253,22 @@ class DashboardWidget(QWidget):
         )
         self._table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         root.addWidget(self._table)
+        root.addSpacing(24)
 
         # Pivot uscite
         lbl_uscite = QLabel("Uscite per categoria")
         lbl_uscite.setStyleSheet("font-size: 14px; font-weight: bold;")
         root.addWidget(lbl_uscite)
+        root.addSpacing(6)
         self._table_uscite = _make_pivot_table()
         root.addWidget(self._table_uscite)
+        root.addSpacing(24)
 
         # Pivot entrate
         lbl_entrate = QLabel("Entrate per categoria")
         lbl_entrate.setStyleSheet("font-size: 14px; font-weight: bold;")
         root.addWidget(lbl_entrate)
+        root.addSpacing(6)
         self._table_entrate = _make_pivot_table()
         root.addWidget(self._table_entrate)
 

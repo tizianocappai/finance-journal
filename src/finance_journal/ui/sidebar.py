@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
+from collections.abc import Callable
+
+from PyQt6.QtCore import QSize, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QFrame,
     QLabel,
@@ -10,15 +13,26 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from finance_journal.ui import icons as ic
 from finance_journal.ui import theme as th
+
+_ICON_SIZE = 18
 
 
 class _SidebarButton(QPushButton):
-    def __init__(self, label: str, section: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        label: str,
+        section: str,
+        icon_fn: Callable[[str, int], QIcon],
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(label, parent)
         self._section = section
+        self._icon_fn = icon_fn
         self.setFlat(True)
         self.setCheckable(False)
+        self.setIconSize(QSize(_ICON_SIZE, _ICON_SIZE))
         self._set_active(False)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
@@ -28,16 +42,18 @@ class _SidebarButton(QPushButton):
 
     def _update_style(self) -> None:
         p = th.current_palette()
+        icon_color = p.sidebar_active if self._active else p.muted
+        self.setIcon(self._icon_fn(icon_color, _ICON_SIZE))
         if self._active:
             self.setStyleSheet(
-                f"text-align: left; padding: 10px 12px 10px 15px; border: none;"
+                f"text-align: left; padding: 10px 12px 10px 12px; border: none;"
                 f" border-left: 3px solid {p.sidebar_active};"
                 f" background-color: {p.kpi_saldo_bg};"
                 f" font-weight: bold;"
             )
         else:
             self.setStyleSheet(
-                f"text-align: left; padding: 10px 12px 10px 18px; border: none;"
+                f"text-align: left; padding: 10px 12px 10px 15px; border: none;"
                 f" background-color: transparent;"
             )
 
@@ -79,11 +95,11 @@ class Sidebar(QFrame):
         )
         layout.addWidget(personale_label)
 
-        self._btn_dashboard = _SidebarButton("Dashboard", "Dashboard")
+        self._btn_dashboard = _SidebarButton("Dashboard", "Dashboard", ic.icon_grid)
         self._btn_dashboard.clicked.connect(lambda: self._on_clicked("Dashboard"))
         layout.addWidget(self._btn_dashboard)
 
-        self._btn_movimenti = _SidebarButton("Movimenti", "Movimenti")
+        self._btn_movimenti = _SidebarButton("Movimenti", "Movimenti", ic.icon_list)
         self._btn_movimenti.clicked.connect(lambda: self._on_clicked("Movimenti"))
         layout.addWidget(self._btn_movimenti)
 
@@ -91,7 +107,7 @@ class Sidebar(QFrame):
         btn_casa.setEnabled(False)
         btn_casa.setFlat(True)
         btn_casa.setStyleSheet(
-            f"text-align: left; padding: 10px 12px 10px 18px;"
+            f"text-align: left; padding: 10px 12px 10px 15px;"
             f" color: {p.muted}; border: none;"
             f" border-top: 1px solid {p.border};"
         )
@@ -99,7 +115,7 @@ class Sidebar(QFrame):
 
         layout.addStretch()
 
-        self._btn_impostazioni = _SidebarButton("Impostazioni", "Impostazioni")
+        self._btn_impostazioni = _SidebarButton("Impostazioni", "Impostazioni", ic.icon_gear)
         self._btn_impostazioni.setStyleSheet(
             self._btn_impostazioni.styleSheet()
             + f" border-top: 1px solid {p.border};"

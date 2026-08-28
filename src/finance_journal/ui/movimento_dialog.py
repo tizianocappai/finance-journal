@@ -70,6 +70,19 @@ class MovimentoDialog(QDialog):
         p = th.current_palette()
         self.setStyleSheet(
             f"QDialog {{ background-color: {p.surface}; border-radius: {th.RADIUS_MD}px; }}"
+            f"QCalendarWidget QAbstractItemView {{"
+            f"  background-color: {p.surface}; color: {p.text};"
+            f"  selection-background-color: {p.primary}; selection-color: white;"
+            f"  alternate-background-color: {p.background}; }}"
+            f"QCalendarWidget QAbstractItemView:disabled {{ color: {p.muted}; }}"
+            f"QCalendarWidget QWidget#qt_calendar_navigationbar {{"
+            f"  background-color: {p.background}; color: {p.text}; }}"
+            f"QCalendarWidget QToolButton {{"
+            f"  background-color: transparent; color: {p.text}; border: none; }}"
+            f"QCalendarWidget QToolButton:hover {{"
+            f"  background-color: {p.sidebar_hover}; border-radius: {th.RADIUS_SM}px; }}"
+            f"QCalendarWidget QSpinBox {{"
+            f"  background-color: {p.surface}; color: {p.text}; border: 1px solid {p.border}; }}"
         )
 
         outer = QVBoxLayout(self)

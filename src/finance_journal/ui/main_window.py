@@ -74,6 +74,9 @@ class MainWindow(QMainWindow):
         sc_find = QShortcut(QKeySequence("Ctrl+F"), self)
         sc_find.activated.connect(self._on_shortcut_find)
 
+        sc_esc = QShortcut(QKeySequence("Escape"), self)
+        sc_esc.activated.connect(self._on_shortcut_esc)
+
     def _on_shortcut_new(self) -> None:
         if self._current is not self._movimenti:
             self._navigate_to("Movimenti")
@@ -83,6 +86,12 @@ class MainWindow(QMainWindow):
         if self._current is not self._movimenti:
             self._navigate_to("Movimenti")
         self._movimenti.focus_search()
+
+    def _on_shortcut_esc(self) -> None:
+        for toast in self.findChildren(Toast):
+            if toast.isVisible():
+                toast.close()
+                return
 
     def _navigate_to(self, section: str) -> None:
         self._sidebar.set_active_section(section)

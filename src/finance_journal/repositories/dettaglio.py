@@ -12,7 +12,7 @@ class DettaglioRepository:
 
     def list(self) -> list[Dettaglio]:
         rows = self._conn.execute(
-            "SELECT id, nome, categoria_id, predefinita FROM dettagli ORDER BY predefinita DESC, nome"
+            "SELECT id, nome, categoria_id, predefinita FROM dettagli ORDER BY nome COLLATE NOCASE"
         ).fetchall()
         return [
             Dettaglio(id=r["id"], nome=r["nome"], categoria_id=r["categoria_id"], predefinita=bool(r["predefinita"]))
