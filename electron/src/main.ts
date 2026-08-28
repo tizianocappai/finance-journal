@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
+import { initDatabase } from './db/index';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -28,6 +29,14 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  try {
+    initDatabase();
+  } catch (err) {
+    console.error('Failed to initialize database:', err);
+    app.quit();
+    return;
+  }
+
   try {
     createWindow();
   } catch (err) {
