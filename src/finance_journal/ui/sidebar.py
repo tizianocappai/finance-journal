@@ -21,7 +21,7 @@ class Sidebar(QWidget):
         layout.setSpacing(0)
 
         # Header
-        header = QLabel("Finance Journal")
+        header = QLabel("No Budget")
         header.setStyleSheet(
             "font-weight: bold; font-size: 14px; padding: 16px 12px;"
             "border-bottom: 1px solid #cccccc;"

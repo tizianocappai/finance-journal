@@ -17,7 +17,7 @@ from finance_journal.ui.sidebar import Sidebar
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Finance Journal")
+        self.setWindowTitle("No Budget")
         self.setMinimumSize(900, 600)
 
         self._conn = create_connection()

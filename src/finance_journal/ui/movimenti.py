@@ -29,7 +29,6 @@ from finance_journal.repositories.dettaglio import DettaglioRepository
 from finance_journal.repositories.impostazioni import ImpostazioniRepository
 from finance_journal.repositories.metodo_pagamento import MetodoPagamentoRepository
 from finance_journal.repositories.movimento import MovimentoRepository
-from finance_journal.ui.import_dialogs import run_import_csv_flow
 from finance_journal.ui.movimento_dialog import MovimentoDialog
 
 logger = logging.getLogger(__name__)
@@ -145,9 +144,6 @@ class MovimentiWidget(QWidget):
         self._btn_elimina_tutti.clicked.connect(self._on_elimina_tutti)
         btn_row.addWidget(self._btn_elimina_tutti)
         btn_row.addStretch()
-        self._btn_importa = QPushButton("Importa CSV")
-        self._btn_importa.clicked.connect(self._on_importa_csv)
-        btn_row.addWidget(self._btn_importa)
         self._btn_add = QPushButton("Aggiungi Movimento")
         self._btn_add.clicked.connect(self._on_add)
         btn_row.addWidget(self._btn_add)
@@ -247,10 +243,6 @@ class MovimentiWidget(QWidget):
         self._reload_lookups()
         self._load_table()
         self.dati_modificati.emit()
-
-    def _on_importa_csv(self) -> None:
-        if run_import_csv_flow(self._conn, self):
-            self._refresh()
 
     def _on_add(self) -> None:
         dialog = MovimentoDialog(
