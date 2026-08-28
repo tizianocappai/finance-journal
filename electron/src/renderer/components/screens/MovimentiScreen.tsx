@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, ICellRendererParams, ValueFormatterParams } from 'ag-grid-community';
-import { Inbox, X } from 'lucide-react';
+import type { ColDef, ICellRendererParams, RowDoubleClickedEvent, ValueFormatterParams } from 'ag-grid-community';
+import { Inbox, Plus, X } from 'lucide-react';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
 import { getAgGridTheme } from '@/lib/ag-theme';
 import { useMovimentiStore } from '@/stores/movimenti';
 import { useLookupStore } from '@/stores/lookup';
 import type { MovimentoWithLookup } from '@/types/movimento';
+import MovimentoDialog from '@/components/MovimentoDialog';
+
+type DialogState =
+  | { open: false }
+  | { open: true; mode: 'create' }
+  | { open: true; mode: 'edit'; movimento: MovimentoWithLookup };
 
 const ANNI = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
 
@@ -78,6 +84,8 @@ export default function MovimentiScreen() {
   const { categorie, metodi, syncCategorie, syncMetodi } = useLookupStore();
   const [testoInput, setTestoInput] = useState(filters.testo ?? '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const [dialog, setDialog] = useState<DialogState>({ open: false });
 
   useEffect(() => {
     fetch();
@@ -156,11 +164,30 @@ export default function MovimentiScreen() {
     [],
   );
 
+  function handleRowDoubleClick(e: RowDoubleClickedEvent<MovimentoWithLookup>) {
+    if (e.data) setDialog({ open: true, mode: 'edit', movimento: e.data });
+  }
+
   return (
+    <>
+    <MovimentoDialog
+      open={dialog.open}
+      mode={dialog.open ? dialog.mode : 'create'}
+      movimento={dialog.open && dialog.mode === 'edit' ? dialog.movimento : undefined}
+      onClose={() => setDialog({ open: false })}
+    />
     <div className="flex h-full flex-col gap-4">
       {/* Header + filtri */}
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-medium text-muted-foreground">Tutti i movimenti</h2>
+        <button
+          onClick={() => setDialog({ open: true, mode: 'create' })}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Nuovo movimento"
+        >
+          <Plus size={13} aria-hidden />
+          Nuovo movimento
+        </button>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <select
@@ -282,9 +309,11 @@ export default function MovimentiScreen() {
             columnDefs={colDefs}
             loading={loading}
             defaultColDef={{ sortable: true, resizable: true }}
+            onRowDoubleClicked={handleRowDoubleClick}
           />
         )}
       </div>
     </div>
+    </>
   );
 }
