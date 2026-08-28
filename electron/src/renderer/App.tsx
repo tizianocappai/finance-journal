@@ -1,24 +1,18 @@
 import { useEffect } from 'react';
+import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-import { AgCharts } from 'ag-charts-community';
-import { cn } from '@/lib/utils';
-import { useAppStore } from '@/stores/app';
-import { useThemeStore, getResolvedTheme, type Theme } from '@/stores/theme';
+import { useThemeStore, getResolvedTheme } from '@/stores/theme';
+import Sidebar from '@/components/Sidebar';
+import ResocontoLayout from '@/components/ResocontoLayout';
+import DashboardScreen from '@/components/screens/DashboardScreen';
+import MovimentiScreen from '@/components/screens/MovimentiScreen';
+import ImpostazioniScreen from '@/components/screens/ImpostazioniScreen';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
-void AgCharts;
-
-const THEME_LABELS: Record<Theme, string> = {
-  light: 'Light',
-  dark: 'Dark',
-  system: 'System',
-};
 
 export default function App() {
-  const ready = useAppStore((s) => s.ready);
-  const { theme, setTheme } = useThemeStore();
+  const { theme } = useThemeStore();
 
-  // Apply class and watch OS preference changes at runtime.
   useEffect(() => {
     const applyDark = (isDark: boolean) => {
       document.documentElement.classList.toggle('dark', isDark);
@@ -40,48 +34,23 @@ export default function App() {
   }, [theme]);
 
   return (
-    <div
-      className={cn(
-        'flex h-screen w-screen flex-col items-center justify-center gap-6',
-        'bg-background text-foreground',
-      )}
-    >
-      <div className="space-y-2 text-center">
-        <h1 className="text-4xl font-bold tracking-tight">No Budget</h1>
-        <p className="text-sm text-muted-foreground">
-          {ready ? 'Scaffold pronto — sviluppo in corso.' : 'Caricamento...'}
-        </p>
-      </div>
+    <MemoryRouter initialEntries={['/resoconto/dashboard']}>
+      <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+        <Sidebar />
 
-      {/* Theme toggle — temporary, for testing */}
-      <div className="flex gap-2">
-        {(['light', 'dark', 'system'] as Theme[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTheme(t)}
-            className={cn(
-              'rounded border px-3 py-1 text-xs transition-colors',
-              theme === t
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-background text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {THEME_LABELS[t]}
-          </button>
-        ))}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Routes>
+            <Route path="/resoconto" element={<ResocontoLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardScreen />} />
+              <Route path="movimenti" element={<MovimentiScreen />} />
+            </Route>
+            <Route path="/impostazioni" element={<ImpostazioniScreen />} />
+            <Route path="*" element={<Navigate to="/resoconto/dashboard" replace />} />
+          </Routes>
+        </div>
       </div>
-
-      <div className="flex gap-3 text-xs text-muted-foreground">
-        <span>React 19</span>
-        <span>·</span>
-        <span>Tailwind v4</span>
-        <span>·</span>
-        <span>AG Grid 36</span>
-        <span>·</span>
-        <span>AG Charts 14</span>
-        <span>·</span>
-        <span>Zustand 5</span>
-      </div>
-    </div>
+    </MemoryRouter>
   );
 }
+
