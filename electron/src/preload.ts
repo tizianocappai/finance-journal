@@ -41,6 +41,11 @@ try {
         ipcRenderer.invoke('dashboard:breakdown-categorie', { anno }),
       trendYoY: (anno: number) => ipcRenderer.invoke('dashboard:trend-yoy', { anno }),
     },
+    fileOps: {
+      exportCsv: () => ipcRenderer.invoke('export:csv') as Promise<{ path: string } | null>,
+      exportJson: () => ipcRenderer.invoke('export:json') as Promise<{ path: string } | null>,
+      importDb: () => ipcRenderer.invoke('import:db') as Promise<undefined | null>,
+    },
   });
 } catch (err) {
   console.error('Failed to expose contextBridge API:', err);

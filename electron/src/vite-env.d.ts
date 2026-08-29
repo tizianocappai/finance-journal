@@ -46,6 +46,11 @@ declare global {
         breakdownCategorie: (anno: number) => Promise<BreakdownCategoria[]>;
         trendYoY: (anno: number) => Promise<TrendYoY>;
       };
+      fileOps: {
+        exportCsv: () => Promise<{ path: string } | null>;
+        exportJson: () => Promise<{ path: string } | null>;
+        importDb: () => Promise<undefined | null>;
+      };
     };
   }
 }

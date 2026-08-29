@@ -1,4 +1,5 @@
 import type { IpcMain } from 'electron';
+import { dialog, app } from 'electron';
 import type Database from 'better-sqlite3';
 import { listCategorie, createCategoria, deleteCategoria } from './categorie';
 import { listMetodi, createMetodo, deleteMetodo } from './metodi_pagamento';
@@ -20,7 +21,53 @@ import {
   getBreakdownCategorie,
   getTrendYoY,
 } from './dashboard';
+import { exportCsv, exportJson, importDb } from './export_import';
 import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
+
+export function registerExportImportHandlers(
+  ipcMain: IpcMain,
+  db: Database.Database,
+  dbPath: string,
+): void {
+  const backupDir = app.getPath('userData');
+
+  async function saveAndExport(
+    fn: (db: Database.Database, filePath: string) => void,
+    defaultPath: string,
+    filterName: string,
+    ext: string,
+  ): Promise<{ path: string } | null> {
+    const result = await dialog.showSaveDialog({
+      defaultPath,
+      filters: [{ name: filterName, extensions: [ext] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    fn(db, result.filePath);
+    return { path: result.filePath };
+  }
+
+  ipcMain.handle('export:csv', () =>
+    saveAndExport(exportCsv, 'movimenti.csv', 'CSV', 'csv'),
+  );
+
+  ipcMain.handle('export:json', () =>
+    saveAndExport(exportJson, 'nobudget-backup.json', 'JSON', 'json'),
+  );
+
+  ipcMain.handle('import:db', async () => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'Database SQLite', extensions: ['db'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+
+    // importDb validates first (db stays open on failure), then closes db, backs up and replaces
+    importDb(db, dbPath, result.filePaths[0], backupDir);
+
+    setTimeout(() => { app.relaunch(); app.exit(); }, 2000);
+    return undefined;
+  });
+}
 
 export function registerLookupHandlers(
   ipcMain: IpcMain,

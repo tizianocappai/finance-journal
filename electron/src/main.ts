@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
-import { initDatabase } from './db/index';
-import { registerLookupHandlers } from './ipc/index';
+import { initDatabase, getDbPath } from './db/index';
+import { registerLookupHandlers, registerExportImportHandlers } from './ipc/index';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -40,6 +40,7 @@ app.whenReady().then(() => {
   }
 
   registerLookupHandlers(ipcMain, db);
+  registerExportImportHandlers(ipcMain, db, getDbPath());
 
   try {
     createWindow();
