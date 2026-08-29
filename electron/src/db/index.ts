@@ -80,17 +80,21 @@ function migrateToV1(db: Database.Database): void {
       db.exec(`ALTER TABLE metodi_pagamento ADD COLUMN predefinito INTEGER NOT NULL DEFAULT 0`);
     }
 
-    // Ricrea dettagli come entità di lookup (era key-value per movimento)
-    db.exec(`DROP TABLE IF EXISTS dettagli`);
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS dettagli (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome         TEXT    NOT NULL UNIQUE,
-        categoria_id INTEGER REFERENCES categorie(id) ON DELETE SET NULL,
-        predefinito  INTEGER NOT NULL DEFAULT 0,
-        created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
+    // Ricrea dettagli come entità di lookup solo se era nel vecchio formato key-value
+    // (senza colonna nome). Se la colonna nome esiste già (DB Python o migrazione già
+    // applicata) il DROP distruggerebbe i dati e romperebbe le FK su movimenti.dettaglio_id.
+    if (!hasColumn(db, 'dettagli', 'nome')) {
+      db.exec(`DROP TABLE IF EXISTS dettagli`);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS dettagli (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome         TEXT    NOT NULL UNIQUE,
+          categoria_id INTEGER REFERENCES categorie(id) ON DELETE SET NULL,
+          predefinito  INTEGER NOT NULL DEFAULT 0,
+          created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+    }
 
     if (!hasColumn(db, 'movimenti', 'dettaglio_id')) {
       db.exec(`ALTER TABLE movimenti ADD COLUMN dettaglio_id INTEGER REFERENCES dettagli(id) ON DELETE SET NULL`);

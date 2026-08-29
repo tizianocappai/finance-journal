@@ -118,6 +118,67 @@ describe('initDatabase — warning DB legacy', () => {
   });
 });
 
+describe('initDatabase — compatibilità DB Python', () => {
+  const tmpDir = path.join(os.tmpdir(), `fj-compat-${process.pid}`);
+  const dbPath = path.join(tmpDir, 'compat.db');
+
+  afterEach(() => {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it('non lancia FOREIGN KEY constraint failed su DB con schema Python e dettaglio_id non-null', () => {
+    // Riproduce esattamente lo schema Python (user_version=0, dettagli come lookup,
+    // movimenti con dettaglio_id NOT NULL). Prima del fix, migrateToV1 faceva DROP TABLE
+    // dettagli rompendo le FK e lanciava "FOREIGN KEY constraint failed".
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const Database = require('better-sqlite3');
+    const seed = new Database(dbPath);
+    seed.exec(`
+      PRAGMA foreign_keys = ON;
+      CREATE TABLE categorie (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        predefinita INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE metodi_pagamento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        predefinito INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE dettagli (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        categoria_id INTEGER NOT NULL REFERENCES categorie(id),
+        predefinita INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE movimenti (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data TEXT NOT NULL,
+        tipo TEXT NOT NULL CHECK(tipo IN ('entrata', 'uscita')),
+        importo REAL NOT NULL CHECK(importo > 0),
+        categoria_id INTEGER NOT NULL REFERENCES categorie(id),
+        metodo_id INTEGER NOT NULL REFERENCES metodi_pagamento(id),
+        nota TEXT NOT NULL DEFAULT '',
+        sezione TEXT NOT NULL DEFAULT 'personale',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        dettaglio_id INTEGER REFERENCES dettagli(id)
+      );
+      CREATE TABLE impostazioni (chiave TEXT PRIMARY KEY, valore TEXT);
+      INSERT INTO categorie (nome) VALUES ('Alimentari');
+      INSERT INTO metodi_pagamento (nome) VALUES ('Contanti');
+      INSERT INTO dettagli (nome, categoria_id) VALUES ('Spesa', 1);
+      INSERT INTO movimenti (data, tipo, importo, categoria_id, metodo_id, dettaglio_id)
+        VALUES ('2024-01-01', 'uscita', 50.0, 1, 1, 1);
+    `);
+    seed.close();
+
+    expect(() => {
+      const db = initDatabase(dbPath);
+      db.close();
+    }).not.toThrow();
+  });
+});
+
 describe('initDatabase (smoke test)', () => {
   const tmpDir = path.join(os.tmpdir(), `fj-test-${process.pid}`);
   const testDbPath = path.join(tmpDir, 'test.db');
