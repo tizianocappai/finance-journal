@@ -2,6 +2,8 @@ allowBuilds:
   electron-winstaller: true
   better-sqlite3: true
   esbuild: true
+  fs-xattr: true
+  macos-alias: true
 minimumReleaseAgeExclude:
   - '@vitejs/plugin-react@6.1.1'
   - lucide-react@1.35.0
@@ -9,3 +11,5 @@ minimumReleaseAgeExclude:
   - react-router@7.18.3
 nodeLinker: hoisted
 blockExoticSubdeps: false
+patchedDependencies:
+  '@electron/packager': patches/@electron__packager.patch

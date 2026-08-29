@@ -7,9 +7,14 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 function createWindow(): void {
+  const iconPath = path.join(
+    app.isPackaged ? process.resourcesPath : path.join(__dirname, '..', '..', 'assets', 'icons'),
+    process.platform === 'darwin' ? 'icon.icns' : 'icon_256x256.png',
+  );
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

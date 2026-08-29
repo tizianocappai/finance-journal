@@ -1,0 +1,23 @@
+diff --git a/dist/unzip.js b/dist/unzip.js
+index d37e170f51f910e97c44fdcca9775244ca7039d4..457311d7ac70a4165cb7f028caa69f485588a011 100644
+--- a/dist/unzip.js
++++ b/dist/unzip.js
+@@ -1,12 +1,11 @@
+ "use strict";
+-var __importDefault = (this && this.__importDefault) || function (mod) {
+-    return (mod && mod.__esModule) ? mod : { "default": mod };
+-};
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.extractElectronZip = void 0;
+-const extract_zip_1 = __importDefault(require("extract-zip"));
++// patched: use @electron-internal/extract-zip which keeps the Node.js event loop
++// alive on Node.js v26+, where yauzl-based extract-zip drains the event loop
++// prematurely (see https://github.com/electron/forge/issues/XXXX)
++const { extract } = require('@electron-internal/extract-zip');
+ async function extractElectronZip(zipPath, targetDir) {
+-    await (0, extract_zip_1.default)(zipPath, { dir: targetDir });
++    await extract(zipPath, { dir: targetDir });
+ }
+ exports.extractElectronZip = extractElectronZip;
+\ No newline at end of file
+-//# sourceMappingURL=unzip.js.map
