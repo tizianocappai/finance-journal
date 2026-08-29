@@ -46,6 +46,13 @@ try {
       exportJson: () => ipcRenderer.invoke('export:json') as Promise<{ path: string } | null>,
       importDb: () => ipcRenderer.invoke('import:db') as Promise<undefined | null>,
     },
+    impostazioni: {
+      dbPath: () => ipcRenderer.invoke('db:path') as Promise<string>,
+      get: (chiave: string) =>
+        ipcRenderer.invoke('impostazioni:get', { chiave }) as Promise<string | null>,
+      set: (chiave: string, valore: string) =>
+        ipcRenderer.invoke('impostazioni:set', { chiave, valore }) as Promise<void>,
+    },
   });
 } catch (err) {
   console.error('Failed to expose contextBridge API:', err);

@@ -22,7 +22,22 @@ import {
   getTrendYoY,
 } from './dashboard';
 import { exportCsv, exportJson, importDb } from './export_import';
+import { getImpostazione, setImpostazione } from './impostazioni';
 import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
+
+export function registerImpostazioniHandlers(
+  ipcMain: IpcMain,
+  db: Database.Database,
+  dbPath: string,
+): void {
+  ipcMain.handle('db:path', () => dbPath);
+  ipcMain.handle('impostazioni:get', (_e, { chiave }: { chiave: string }) =>
+    getImpostazione(db, chiave),
+  );
+  ipcMain.handle('impostazioni:set', (_e, { chiave, valore }: { chiave: string; valore: string }) =>
+    setImpostazione(db, chiave, valore),
+  );
+}
 
 export function registerExportImportHandlers(
   ipcMain: IpcMain,

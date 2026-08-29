@@ -51,6 +51,11 @@ declare global {
         exportJson: () => Promise<{ path: string } | null>;
         importDb: () => Promise<undefined | null>;
       };
+      impostazioni: {
+        dbPath: () => Promise<string>;
+        get: (chiave: string) => Promise<string | null>;
+        set: (chiave: string, valore: string) => Promise<void>;
+      };
     };
   }
 }
