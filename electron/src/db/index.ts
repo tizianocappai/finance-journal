@@ -3,27 +3,28 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export function getDbPath(): string {
-  const appName = 'finance-journal';
+const APP_NAME = 'finance-journal';
+export const DB_FILENAME = 'finance.db';
+export const LEGACY_DB_FILENAME = 'finance-journal.db';
 
+export function getDbPath(): string {
   let baseDir: string;
 
   try {
     if (process.platform === 'darwin') {
-      baseDir = path.join(os.homedir(), 'Library', 'Application Support', appName);
+      baseDir = path.join(os.homedir(), 'Library', 'Application Support', APP_NAME);
     } else if (process.platform === 'win32') {
       const localAppData = process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local');
-      baseDir = path.join(localAppData, appName, appName);
+      baseDir = path.join(localAppData, APP_NAME, APP_NAME);
     } else {
-      // Linux + altri Unix
       const xdgData = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), '.local', 'share');
-      baseDir = path.join(xdgData, appName);
+      baseDir = path.join(xdgData, APP_NAME);
     }
   } catch (err) {
     throw new Error(`Failed to resolve DB base path: ${String(err)}`);
   }
 
-  return path.join(baseDir, `${appName}.db`);
+  return path.join(baseDir, DB_FILENAME);
 }
 
 const SCHEMA_V0_SQL = `
@@ -169,6 +170,15 @@ export function initDatabase(dbPath?: string): Database.Database {
       fs.mkdirSync(dir, { recursive: true });
     } catch (err) {
       throw new Error(`Failed to create DB directory: ${String(err)}`);
+    }
+
+    const legacyPath = path.join(path.dirname(resolvedPath), LEGACY_DB_FILENAME);
+    if (!fs.existsSync(resolvedPath) && fs.existsSync(legacyPath)) {
+      console.warn(
+        `[DB] File atteso non trovato: ${resolvedPath}\n` +
+          `[DB] Trovato DB legacy: ${legacyPath}\n` +
+          `[DB] Rinominare il file in "${DB_FILENAME}" per recuperare i dati precedenti.`,
+      );
     }
   }
 

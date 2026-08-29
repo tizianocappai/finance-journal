@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import { getDbPath, initDatabase } from './index';
+import { getDbPath, initDatabase, DB_FILENAME, LEGACY_DB_FILENAME } from './index';
 
 const EXPECTED_TABLES = [
   'movimenti',
@@ -13,9 +13,9 @@ const EXPECTED_TABLES = [
 ];
 
 describe('getDbPath', () => {
-  it('restituisce un path che termina con finance-journal.db', () => {
+  it(`restituisce un path che termina con ${DB_FILENAME}`, () => {
     const dbPath = getDbPath();
-    expect(dbPath).toMatch(/finance-journal\.db$/);
+    expect(dbPath).toMatch(/finance\.db$/);
   });
 
   it('su macOS punta a ~/Library/Application Support/finance-journal/', () => {
@@ -26,7 +26,7 @@ describe('getDbPath', () => {
       'Library',
       'Application Support',
       'finance-journal',
-      'finance-journal.db',
+      DB_FILENAME,
     );
     expect(dbPath).toBe(expected);
   });
@@ -41,10 +41,80 @@ describe('getDbPath', () => {
       '.local',
       'share',
       'finance-journal',
-      'finance-journal.db',
+      DB_FILENAME,
     );
     expect(dbPath).toBe(expected);
     if (saved !== undefined) process.env.XDG_DATA_HOME = saved;
+  });
+
+  it('su Windows punta a %LOCALAPPDATA%\\finance-journal\\finance-journal\\', () => {
+    if (process.platform !== 'win32') return;
+    const saved = process.env.LOCALAPPDATA;
+    process.env.LOCALAPPDATA = 'C:\\Users\\test\\AppData\\Local';
+    const dbPath = getDbPath();
+    const expected = path.join(
+      'C:\\Users\\test\\AppData\\Local',
+      'finance-journal',
+      'finance-journal',
+      DB_FILENAME,
+    );
+    expect(dbPath).toBe(expected);
+    if (saved !== undefined) process.env.LOCALAPPDATA = saved;
+    else delete process.env.LOCALAPPDATA;
+  });
+});
+
+describe('DB_FILENAME / LEGACY_DB_FILENAME', () => {
+  it('DB_FILENAME corrisponde al file usato da Python', () => {
+    expect(DB_FILENAME).toBe('finance.db');
+  });
+
+  it('LEGACY_DB_FILENAME è il vecchio nome Electron errato', () => {
+    expect(LEGACY_DB_FILENAME).toBe('finance-journal.db');
+  });
+});
+
+describe('initDatabase — warning DB legacy', () => {
+  const tmpDir = path.join(os.tmpdir(), `fj-legacy-${process.pid}`);
+
+  afterEach(() => {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // best-effort cleanup
+    }
+  });
+
+  it('emette warning se esiste finance-journal.db ma non finance.db', () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const newPath = path.join(tmpDir, DB_FILENAME);
+    const legacyPath = path.join(tmpDir, LEGACY_DB_FILENAME);
+    fs.writeFileSync(legacyPath, '');
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const db = initDatabase(newPath);
+      db.close();
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toContain(LEGACY_DB_FILENAME);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('non emette warning se finance.db esiste già', () => {
+    const newPath = path.join(tmpDir, DB_FILENAME);
+    const db0 = initDatabase(newPath);
+    db0.close();
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const db = initDatabase(newPath);
+      db.close();
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 
