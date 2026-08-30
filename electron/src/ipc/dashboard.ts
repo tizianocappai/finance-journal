@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY, RiepilogoMensile, RiepilogoMensileResult } from './types';
+import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY, RiepilogoMensile, RiepilogoMensileResult, PivotCategoriaRiga } from './types';
 import { getSaldoIniziale } from './impostazioni';
 
 const NOMI_MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
@@ -161,6 +161,49 @@ export function getRiepilogoMensile(db: Database.Database, anno: number): Riepil
     return { righe, totale, media, mediana: medianaVal };
   } catch (err) {
     throw new Error('Failed to get riepilogo mensile', { cause: err });
+  }
+}
+
+export function getPivotCategorie(
+  db: Database.Database,
+  anno: number,
+  tipo: 'uscita' | 'entrata',
+): PivotCategoriaRiga[] {
+  try {
+    const rows = db
+      .prepare(
+        `SELECT
+          COALESCE(c.nome, 'Senza categoria') AS categoria,
+          CAST(strftime('%m', m.data) AS INTEGER) AS mese,
+          SUM(m.importo) AS importo
+        FROM movimenti m
+        LEFT JOIN categorie c ON c.id = m.categoria_id
+        WHERE strftime('%Y', m.data) = ? AND m.tipo = ?
+        GROUP BY m.categoria_id, c.nome, CAST(strftime('%m', m.data) AS INTEGER)
+        ORDER BY c.nome, mese`,
+      )
+      .all(String(anno), tipo) as { categoria: string; mese: number; importo: number }[];
+
+    if (rows.length === 0) return [];
+
+    const map = new Map<string, number[]>();
+    for (const r of rows) {
+      if (!map.has(r.categoria)) map.set(r.categoria, new Array(12).fill(0));
+      map.get(r.categoria)![r.mese - 1] += r.importo;
+    }
+
+    return Array.from(map.entries()).map(([categoria, mesi]) => {
+      const totale = mesi.reduce((acc, v) => acc + v, 0);
+      return {
+        categoria,
+        mesi,
+        totale,
+        media: totale / 12,
+        mediana: mediana(mesi),
+      };
+    });
+  } catch (err) {
+    throw new Error(`Failed to get pivot categorie: ${String(err)}`);
   }
 }
 

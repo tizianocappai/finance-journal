@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY, RiepilogoMensileResult } from '../../ipc/types';
+import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY, RiepilogoMensileResult, PivotCategoriaRiga } from '../../ipc/types';
 
 interface DashboardState {
   anno: number;
@@ -8,6 +8,8 @@ interface DashboardState {
   breakdownCategorie: BreakdownCategoria[];
   trend: TrendYoY | null;
   riepilogoMensile: RiepilogoMensileResult | null;
+  pivotUscite: PivotCategoriaRiga[];
+  pivotEntrate: PivotCategoriaRiga[];
   loading: boolean;
   error: string | null;
 
@@ -24,6 +26,8 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
   breakdownCategorie: [],
   trend: null,
   riepilogoMensile: null,
+  pivotUscite: [],
+  pivotEntrate: [],
   loading: false,
   error: null,
 
@@ -36,14 +40,17 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
     const { anno } = get();
     set({ loading: true, error: null });
     try {
-      const [kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile] = await Promise.all([
-        window.electronAPI.dashboard.kpi(anno),
-        window.electronAPI.dashboard.serieMensili(anno),
-        window.electronAPI.dashboard.breakdownCategorie(anno),
-        window.electronAPI.dashboard.trendYoY(anno),
-        window.electronAPI.dashboard.riepilogoMensile(anno),
-      ]);
-      set({ kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile, loading: false });
+      const [kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile, pivotUscite, pivotEntrate] =
+        await Promise.all([
+          window.electronAPI.dashboard.kpi(anno),
+          window.electronAPI.dashboard.serieMensili(anno),
+          window.electronAPI.dashboard.breakdownCategorie(anno),
+          window.electronAPI.dashboard.trendYoY(anno),
+          window.electronAPI.dashboard.riepilogoMensile(anno),
+          window.electronAPI.dashboard.pivotCategorie(anno, 'uscita'),
+          window.electronAPI.dashboard.pivotCategorie(anno, 'entrata'),
+        ]);
+      set({ kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile, pivotUscite, pivotEntrate, loading: false });
     } catch (err) {
       set({ loading: false, error: String(err) });
     }

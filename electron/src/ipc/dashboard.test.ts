@@ -7,6 +7,7 @@ import {
   getBreakdownCategorie,
   getTrendYoY,
   getRiepilogoMensile,
+  getPivotCategorie,
 } from './dashboard';
 import { createMovimento } from './movimenti';
 import { listCategorie } from './categorie';
@@ -321,5 +322,97 @@ describe('getRiepilogoMensile', () => {
     expect(sortedSaldos).toHaveLength(12);
     const expectedMediana = (sortedSaldos[5] + sortedSaldos[6]) / 2;
     expect(result.mediana.saldo).toBeCloseTo(expectedMediana, 5);
+  });
+});
+
+describe('getPivotCategorie', () => {
+  it('restituisce lista vuota per anno senza movimenti del tipo', () => {
+    createMovimento(db, { data: '2024-01-10', importo: 100, tipo: 'entrata' });
+    expect(getPivotCategorie(db, 2024, 'uscita')).toHaveLength(0);
+  });
+
+  it('pivot uscite: 2 categorie, mesi diversi', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    const utenze = categorie.find((c) => c.nome === 'Utenze')!;
+
+    // Alimentari: gen 200, mar 300
+    createMovimento(db, { data: '2024-01-10', importo: 200, tipo: 'uscita', categoria_id: ali.id });
+    createMovimento(db, { data: '2024-03-15', importo: 300, tipo: 'uscita', categoria_id: ali.id });
+    // Utenze: feb 150
+    createMovimento(db, { data: '2024-02-20', importo: 150, tipo: 'uscita', categoria_id: utenze.id });
+
+    const pivot = getPivotCategorie(db, 2024, 'uscita');
+    expect(pivot).toHaveLength(2);
+
+    const rowAli = pivot.find((r) => r.categoria === 'Alimentari')!;
+    expect(rowAli.mesi).toHaveLength(12);
+    expect(rowAli.mesi[0]).toBe(200);   // gen (indice 0)
+    expect(rowAli.mesi[1]).toBe(0);     // feb
+    expect(rowAli.mesi[2]).toBe(300);   // mar
+    expect(rowAli.mesi[3]).toBe(0);     // apr
+
+    const rowUt = pivot.find((r) => r.categoria === 'Utenze')!;
+    expect(rowUt.mesi[0]).toBe(0);
+    expect(rowUt.mesi[1]).toBe(150);
+  });
+
+  it('totale riga = somma mesi', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    createMovimento(db, { data: '2024-01-10', importo: 200, tipo: 'uscita', categoria_id: ali.id });
+    createMovimento(db, { data: '2024-03-15', importo: 300, tipo: 'uscita', categoria_id: ali.id });
+
+    const pivot = getPivotCategorie(db, 2024, 'uscita');
+    const row = pivot.find((r) => r.categoria === 'Alimentari')!;
+    const sommaMesi = row.mesi.reduce((acc, v) => acc + v, 0);
+    expect(row.totale).toBeCloseTo(sommaMesi, 5);
+  });
+
+  it('media riga = totale / 12', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    createMovimento(db, { data: '2024-01-10', importo: 120, tipo: 'uscita', categoria_id: ali.id });
+
+    const pivot = getPivotCategorie(db, 2024, 'uscita');
+    const row = pivot.find((r) => r.categoria === 'Alimentari')!;
+    expect(row.media).toBeCloseTo(row.totale / 12, 5);
+  });
+
+  it('mediana riga calcolata sui 12 mesi', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    createMovimento(db, { data: '2024-01-10', importo: 100, tipo: 'uscita', categoria_id: ali.id });
+    createMovimento(db, { data: '2024-06-10', importo: 200, tipo: 'uscita', categoria_id: ali.id });
+
+    const pivot = getPivotCategorie(db, 2024, 'uscita');
+    const row = pivot.find((r) => r.categoria === 'Alimentari')!;
+    const sorted = [...row.mesi].sort((a, b) => a - b);
+    const expectedMediana = (sorted[5] + sorted[6]) / 2;
+    expect(row.mediana).toBeCloseTo(expectedMediana, 5);
+  });
+
+  it('pivot entrate: isola tipo entrata', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    createMovimento(db, { data: '2024-01-10', importo: 500, tipo: 'entrata', categoria_id: ali.id });
+    createMovimento(db, { data: '2024-01-15', importo: 200, tipo: 'uscita', categoria_id: ali.id });
+
+    const pivotEntrate = getPivotCategorie(db, 2024, 'entrata');
+    const pivotUscite = getPivotCategorie(db, 2024, 'uscita');
+
+    const rowEntrata = pivotEntrate.find((r) => r.categoria === 'Alimentari')!;
+    expect(rowEntrata.mesi[0]).toBe(500);
+
+    const rowUscita = pivotUscite.find((r) => r.categoria === 'Alimentari')!;
+    expect(rowUscita.mesi[0]).toBe(200);
+  });
+
+  it('anno diverso non interferisce', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    createMovimento(db, { data: '2023-05-10', importo: 999, tipo: 'uscita', categoria_id: ali.id });
+
+    expect(getPivotCategorie(db, 2024, 'uscita')).toHaveLength(0);
   });
 });

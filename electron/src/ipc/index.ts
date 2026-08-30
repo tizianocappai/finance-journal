@@ -23,6 +23,7 @@ import {
   getBreakdownCategorie,
   getTrendYoY,
   getRiepilogoMensile,
+  getPivotCategorie,
 } from './dashboard';
 import { exportCsv, exportJson, importDb } from './export_import';
 import { getImpostazione, setImpostazione } from './impostazioni';
@@ -151,5 +152,10 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('dashboard:riepilogo-mensile', (_e, { anno }: { anno: number }) =>
     getRiepilogoMensile(db, anno),
+  );
+  ipcMain.handle(
+    'dashboard:pivot-categorie',
+    (_e, { anno, tipo }: { anno: number; tipo: 'uscita' | 'entrata' }) =>
+      getPivotCategorie(db, anno, tipo),
   );
 }

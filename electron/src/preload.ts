@@ -46,6 +46,8 @@ try {
       trendYoY: (anno: number) => ipcRenderer.invoke('dashboard:trend-yoy', { anno }),
       riepilogoMensile: (anno: number) =>
         ipcRenderer.invoke('dashboard:riepilogo-mensile', { anno }),
+      pivotCategorie: (anno: number, tipo: 'uscita' | 'entrata') =>
+        ipcRenderer.invoke('dashboard:pivot-categorie', { anno, tipo }),
     },
     fileOps: {
       exportCsv: () => ipcRenderer.invoke('export:csv') as Promise<{ path: string } | null>,

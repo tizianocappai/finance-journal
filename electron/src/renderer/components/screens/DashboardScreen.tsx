@@ -4,7 +4,7 @@ import type { AgChartOptions, AgChartTheme } from 'ag-charts-community';
 import { TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, PieChart } from 'lucide-react';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
 import { useDashboardStore } from '@/stores/dashboard';
-import type { RiepilogoMensileResult } from '../../../ipc/types';
+import type { RiepilogoMensileResult, PivotCategoriaRiga } from '../../../ipc/types';
 
 const COLOR_ENTRATE = '#22c55e';
 const COLOR_USCITE = '#ef4444';
@@ -301,12 +301,107 @@ function RiepilogoMensileTable({ data }: RiepilogoMensileTableProps) {
   );
 }
 
+const NOMI_MESI_SHORT = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+
+interface PivotCategorieTableProps {
+  righe: PivotCategoriaRiga[];
+  tipo: 'uscita' | 'entrata';
+}
+
+function PivotCategorieTable({ righe, tipo }: PivotCategorieTableProps) {
+  const headingId = `pivot-${tipo}-heading`;
+  const label = tipo === 'uscita' ? 'Uscite per Categoria' : 'Entrate per Categoria';
+  const amountCls =
+    tipo === 'uscita' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
+
+  if (righe.length === 0) {
+    return (
+      <section aria-labelledby={headingId}>
+        <h3 id={headingId} className="mb-3 text-sm font-medium text-muted-foreground">
+          {label}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Nessun {tipo === 'uscita' ? "uscita" : "entrata"} registrata per quest'anno.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-labelledby={headingId}>
+      <h3 id={headingId} className="mb-3 text-sm font-medium text-muted-foreground">
+        {label}
+      </h3>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/40">
+              <th
+                scope="col"
+                className="sticky left-0 z-10 bg-muted/40 px-4 py-2.5 text-left font-medium text-muted-foreground"
+              >
+                Categoria
+              </th>
+              {NOMI_MESI_SHORT.map((m) => (
+                <th
+                  key={m}
+                  scope="col"
+                  className="px-3 py-2.5 text-right font-medium text-muted-foreground"
+                >
+                  {m}
+                </th>
+              ))}
+              <th scope="col" className="px-3 py-2.5 text-right font-medium text-muted-foreground">
+                Totale
+              </th>
+              <th scope="col" className="px-3 py-2.5 text-right font-medium text-muted-foreground">
+                Media
+              </th>
+              <th scope="col" className="px-3 py-2.5 text-right font-medium text-muted-foreground">
+                Mediana
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {righe.map((r) => (
+              <tr
+                key={r.categoria}
+                className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
+              >
+                <td className="sticky left-0 z-10 bg-card px-4 py-2 font-medium text-foreground whitespace-nowrap hover:bg-muted/20">
+                  {r.categoria}
+                </td>
+                {r.mesi.map((v, i) => (
+                  <td key={i} className={`px-3 py-2 text-right tabular-nums ${v === 0 ? 'text-muted-foreground' : amountCls}`}>
+                    {v === 0 ? '—' : formatEuro(v)}
+                  </td>
+                ))}
+                <td className={`px-3 py-2 text-right tabular-nums font-medium ${amountCls}`}>
+                  {formatEuro(r.totale)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  {formatEuro(r.media)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  {formatEuro(r.mediana)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function DashboardScreen() {
   const { theme } = useThemeStore();
   const isDark = getResolvedTheme(theme) === 'dark';
 
-  const { anno, kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile, loading, error, fetch, setAnno } =
-    useDashboardStore();
+  const {
+    anno, kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile,
+    pivotUscite, pivotEntrate, loading, error, fetch, setAnno,
+  } = useDashboardStore();
 
   useEffect(() => {
     fetch();
@@ -407,6 +502,9 @@ export default function DashboardScreen() {
           </section>
 
           {riepilogoMensile && <RiepilogoMensileTable data={riepilogoMensile} />}
+
+          <PivotCategorieTable righe={pivotUscite} tipo="uscita" />
+          <PivotCategorieTable righe={pivotEntrate} tipo="entrata" />
 
           {/* Grafici */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

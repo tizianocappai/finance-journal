@@ -125,3 +125,11 @@ export interface RiepilogoMensileResult {
   media: RiepilogoFooter;
   mediana: RiepilogoFooter;
 }
+
+export interface PivotCategoriaRiga {
+  categoria: string;
+  mesi: number[];
+  totale: number;
+  media: number;
+  mediana: number;
+}
