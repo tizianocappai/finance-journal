@@ -674,7 +674,7 @@ export default function ResocontoImpostazioniScreen() {
         description="Aggiungi categorie personalizzate o elimina quelle che non usi. Le categorie predefinite non sono eliminabili."
         predefinedLabel="predefinita"
         items={categorieItems}
-        onAdd={createCategoria}
+        onAdd={async (nome) => { await createCategoria(nome); }}
         onDelete={deleteCategoria}
       />
 

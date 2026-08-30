@@ -7,7 +7,8 @@ interface LookupState {
   dettagli: Dettaglio[];
 
   syncCategorie: () => Promise<void>;
-  createCategoria: (nome: string, colore?: string, icona?: string) => Promise<void>;
+  createCategoria: (nome: string, colore?: string, icona?: string) => Promise<Categoria>;
+  updateCategoria: (id: number, nome: string, colore?: string, icona?: string) => Promise<void>;
   deleteCategoria: (id: number) => Promise<void>;
 
   syncMetodi: () => Promise<void>;
@@ -21,7 +22,7 @@ interface LookupState {
   updateDettaglioCategoria: (id: number, categoria_id: number | null) => Promise<void>;
 }
 
-export const useLookupStore = create<LookupState>()((set) => ({
+export const useLookupStore = create<LookupState>()((set, get) => ({
   categorie: [],
   metodi: [],
   dettagli: [],
@@ -37,18 +38,33 @@ export const useLookupStore = create<LookupState>()((set) => ({
 
   createCategoria: async (nome, colore, icona) => {
     try {
-      await window.electronAPI.categorie.create({ nome, colore, icona });
+      const created = await window.electronAPI.categorie.create({ nome, colore, icona });
       const data = await window.electronAPI.categorie.list();
       set({ categorie: data });
+      return created as Categoria;
     } catch (err) {
       console.error('createCategoria failed:', err);
       throw err;
     }
   },
 
+  updateCategoria: async (id, nome, colore, icona) => {
+    try {
+      const updated = await window.electronAPI.categorie.update(id, nome, colore, icona);
+      set((state) => ({
+        categorie: state.categorie.map((c) => (c.id === id ? (updated as Categoria) : c)),
+      }));
+    } catch (err) {
+      console.error('updateCategoria failed:', err);
+      throw err;
+    }
+  },
+
   deleteCategoria: async (id) => {
     try {
-      await window.electronAPI.categorie.delete(id);
+      const other = get().categorie.find((c) => c.id !== id);
+      if (!other) throw new Error('Nessuna categoria alternativa disponibile');
+      await window.electronAPI.categorie.delete(id, other.id);
       const data = await window.electronAPI.categorie.list();
       set({ categorie: data });
     } catch (err) {

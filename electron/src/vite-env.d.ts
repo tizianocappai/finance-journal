@@ -25,7 +25,9 @@ declare global {
       categorie: {
         list: () => Promise<Categoria[]>;
         create: (data: { nome: string; colore?: string; icona?: string }) => Promise<Categoria>;
-        delete: (id: number) => Promise<void>;
+        update: (id: number, nome: string, colore?: string, icona?: string) => Promise<Categoria>;
+        countMovimenti: (id: number) => Promise<number>;
+        delete: (id: number, targetCategoriaId: number) => Promise<void>;
       };
       metodi_pagamento: {
         list: () => Promise<MetodoPagamento[]>;
