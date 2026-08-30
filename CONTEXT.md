@@ -64,14 +64,15 @@ Vista aggregata di un Anno Finanziario per una Sezione. Mostra: KPI sintetici (t
 **Build tool**: Electron Forge + Vite plugin — cross-platform; produce `.app`+`.dmg` su macOS, `.exe` su Windows, AppImage su Linux.
 **Firma**: nessuna per ora. Gli utenti macOS devono fare clic destro → Apri → Apri comunque (workaround Gatekeeper documentato in INSTALL.md).
 **Icona**: simbolo `€` bianco su sfondo verde scuro `#1B5E20`.
-**Distribuzione**: GitHub Releases — artefatti caricati manualmente a ogni release.
+**Distribuzione**: GitHub Releases — artefatti generati e caricati automaticamente dal CI (GitHub Actions) al push di un tag `v*.*.*`. La release viene creata come draft; le note vengono aggiunte manualmente dall'autore prima della pubblicazione.
+**Tag di release**: Tag Git nel formato `v<major>.<minor>.<patch>` (es. `v1.2.3`). Il push del tag triggerà il workflow di release. La versione in `electron/package.json` deve essere allineata al tag prima del push.
+**Workflow di release**: Pipeline GitHub Actions composta da tre job: `test` (verifica regressioni su ubuntu), `create-draft` (crea la draft release su GitHub), `build` (matrix su macOS 15/Windows/Linux che builda e carica gli artefatti). Il build richiede `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` per sopprimere un warning Vite che emerge in contesto CI durante la compilazione di moduli nativi.
 **DB path**: `app.getPath('userData')` di Electron — percorso cross-platform per i dati utente (Linux: `~/.config/`, macOS: `~/Library/Application Support/`, Windows: `%APPDATA%/`).
 
 ## Regole di dominio
 
 - L'importo di un Movimento è sempre un numero positivo. Il Tipo (Entrata/Uscita) ne determina il segno ai fini del calcolo del Saldo.
-- Eliminare una Categoria in uso richiede conferma esplicita; i Movimenti associati vengono riassegnati alla categoria "Altro".
-- Eliminare un Dettaglio imposta `dettaglio_id = NULL` sui Movimenti che lo referenziano; la Categoria di quei Movimenti rimane invariata.
-- I Dettagli predefiniti non possono essere eliminati (analogo alle Categorie predefinite).
+- Eliminare una Categoria che ha Movimenti associati richiede la scelta di una Categoria destinazione (esistente o nuova) a cui riassegnare i Movimenti affetti. Se nessun Movimento è associato, l'eliminazione avviene direttamente.
+- Eliminare un Dettaglio che ha Movimenti associati richiede la scelta di un Dettaglio destinazione (esistente o nuovo) a cui riassegnarli; la Categoria di quei Movimenti rimane invariata. Se nessun Movimento è associato, l'eliminazione avviene direttamente.
 - La stessa regola vale per i Metodi di Pagamento custom eliminati.
 - Il Saldo Iniziale, se presente, viene sommato al Saldo calcolato dai Movimenti a partire dalla sua data.

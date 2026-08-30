@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: electron/pnpm-lock.yaml
+      - run: pnpm install
+      - run: pnpm test
+
+  create-draft:
+    name: Create Draft Release
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --draft --title "$TAG" --notes-file /dev/null
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: create-draft
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            os: macos-15
+            args: --arch=universal
+          - platform: windows
+            os: windows-latest
+            args: --arch=x64
+          - platform: linux
+            os: ubuntu-latest
+            args: --arch=x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: electron/pnpm-lock.yaml
+      - name: Install rpm tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends rpm
+      - run: pnpm install
+      - name: Make
+        env:
+          VITE_CONFIG_NATIVE_IGNORE_WARNING: 'true'
+        run: pnpm exec electron-forge make ${{ matrix.args }}
+      - name: Upload artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          find out/make -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" \) -print0 | \
+            xargs -0 -I{} gh release upload "$TAG" "{}" --clobber
