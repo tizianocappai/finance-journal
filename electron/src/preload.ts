@@ -55,6 +55,8 @@ try {
       exportCsv: () => ipcRenderer.invoke('export:csv') as Promise<{ path: string } | null>,
       exportJson: () => ipcRenderer.invoke('export:json') as Promise<{ path: string } | null>,
       importDb: () => ipcRenderer.invoke('import:db') as Promise<undefined | null>,
+      importCsvPreview: () => ipcRenderer.invoke('import:previewCsv') as Promise<import('./ipc/import_csv').PreviewResult | null>,
+      importCsvExecute: (filePath: string) => ipcRenderer.invoke('import:executeCsv', { filePath }) as Promise<import('./ipc/import_csv').ExecuteResult>,
     },
     impostazioni: {
       dbPath: () => ipcRenderer.invoke('db:path') as Promise<string>,

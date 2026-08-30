@@ -17,6 +17,7 @@ import type {
   PivotCategoriaRiga,
   TrendMensile,
 } from './ipc/types';
+import type { PreviewResult, ExecuteResult } from './ipc/import_csv';
 
 declare global {
   interface Window {
@@ -58,6 +59,8 @@ declare global {
         exportCsv: () => Promise<{ path: string } | null>;
         exportJson: () => Promise<{ path: string } | null>;
         importDb: () => Promise<undefined | null>;
+        importCsvPreview: () => Promise<PreviewResult | null>;
+        importCsvExecute: (filePath: string) => Promise<ExecuteResult>;
       };
       impostazioni: {
         dbPath: () => Promise<string>;

@@ -27,6 +27,7 @@ import {
   getTrendMensile,
 } from './dashboard';
 import { exportCsv, exportJson, importDb } from './export_import';
+import { previewCsv, executeCsv } from './import_csv';
 import { getImpostazione, setImpostazione } from './impostazioni';
 import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
 
@@ -86,6 +87,27 @@ export function registerExportImportHandlers(
 
     setTimeout(() => { app.relaunch(); app.exit(); }, 2000);
     return undefined;
+  });
+
+  ipcMain.handle('import:previewCsv', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        filters: [{ name: 'CSV', extensions: ['csv', 'tsv', 'txt'] }],
+        properties: ['openFile'],
+      });
+      if (result.canceled || result.filePaths.length === 0) return null;
+      return previewCsv(db, result.filePaths[0]);
+    } catch (err) {
+      throw new Error(`Errore analisi CSV: ${String(err)}`);
+    }
+  });
+
+  ipcMain.handle('import:executeCsv', (_e, { filePath }: { filePath: string }) => {
+    try {
+      return executeCsv(db, filePath);
+    } catch (err) {
+      throw new Error(`Errore import CSV: ${String(err)}`);
+    }
   });
 }
 

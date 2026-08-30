@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, X } from 'lucide-react';
 import { useThemeStore, type Theme } from '@/stores/theme';
 import { useLookupStore } from '@/stores/lookup';
 import { cn } from '@/lib/utils';
 import type { Categoria, MetodoPagamento } from '../../../ipc/types';
+import type { PreviewResult, ExecuteResult } from '../../../ipc/import_csv';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,177 @@ function EntityList({ headingId, label, description, predefinedLabel, items, onA
   );
 }
 
+// ─── import CSV modal ─────────────────────────────────────────────────────────
+
+type ImportCsvState =
+  | { phase: 'preview'; preview: PreviewResult }
+  | { phase: 'executing' }
+  | { phase: 'done'; result: ExecuteResult };
+
+interface ImportCsvModalProps {
+  state: ImportCsvState;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+function ImportCsvModal({ state, onConfirm, onClose }: ImportCsvModalProps) {
+  const PILL = 'inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground';
+  const SECTION_LABEL = 'mb-1 text-xs font-semibold text-foreground';
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Anteprima import CSV"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
+      <div className="relative w-full max-w-md rounded-lg border border-border bg-background shadow-lg">
+
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Import CSV</h2>
+          {state.phase !== 'executing' && (
+            <button
+              onClick={onClose}
+              className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Chiudi"
+            >
+              <X size={14} aria-hidden />
+            </button>
+          )}
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+
+          {state.phase === 'preview' && (() => {
+            const { preview } = state;
+            const hasNew =
+              preview.nuove_entita.categorie.length > 0 ||
+              preview.nuove_entita.metodi.length > 0 ||
+              preview.nuove_entita.dettagli.length > 0;
+            return (
+              <>
+                <div className="flex gap-4">
+                  <div className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-center">
+                    <p className="text-lg font-semibold text-foreground">{preview.valide}</p>
+                    <p className="text-xs text-muted-foreground">da importare</p>
+                  </div>
+                  <div className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-center">
+                    <p className={cn('text-lg font-semibold', preview.saltate.length > 0 ? 'text-destructive' : 'text-foreground')}>
+                      {preview.saltate.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">da saltare</p>
+                  </div>
+                </div>
+
+                {hasNew && (
+                  <div>
+                    <p className={SECTION_LABEL}>Nuove entità che verranno create</p>
+                    <div className="space-y-1">
+                      {preview.nuove_entita.categorie.length > 0 && (
+                        <div>
+                          <span className="text-xs text-muted-foreground">Categorie: </span>
+                          {preview.nuove_entita.categorie.map(n => (
+                            <span key={n} className={cn(PILL, 'mr-1')}>{n}</span>
+                          ))}
+                        </div>
+                      )}
+                      {preview.nuove_entita.metodi.length > 0 && (
+                        <div>
+                          <span className="text-xs text-muted-foreground">Metodi: </span>
+                          {preview.nuove_entita.metodi.map(n => (
+                            <span key={n} className={cn(PILL, 'mr-1')}>{n}</span>
+                          ))}
+                        </div>
+                      )}
+                      {preview.nuove_entita.dettagli.length > 0 && (
+                        <div>
+                          <span className="text-xs text-muted-foreground">Dettagli: </span>
+                          {preview.nuove_entita.dettagli.map(n => (
+                            <span key={n} className={cn(PILL, 'mr-1')}>{n}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {preview.saltate.length > 0 && (
+                  <div>
+                    <p className={SECTION_LABEL}>Righe saltate</p>
+                    <ul className="max-h-32 overflow-auto space-y-1 rounded-md border border-border bg-muted p-2">
+                      {preview.saltate.map(s => (
+                        <li key={s.row_num} className="text-xs">
+                          <span className="font-medium text-foreground">Riga {s.row_num}:</span>{' '}
+                          <span className="text-muted-foreground">{s.reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
+          {state.phase === 'executing' && (
+            <p className="py-4 text-center text-sm text-muted-foreground">Import in corso…</p>
+          )}
+
+          {state.phase === 'done' && (
+            <>
+              <div className="flex gap-4">
+                <div className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-center">
+                  <p className="text-lg font-semibold text-foreground">{state.result.importati}</p>
+                  <p className="text-xs text-muted-foreground">importati</p>
+                </div>
+                <div className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-center">
+                  <p className={cn('text-lg font-semibold', state.result.saltati.length > 0 ? 'text-destructive' : 'text-foreground')}>
+                    {state.result.saltati.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">saltati</p>
+                </div>
+              </div>
+
+              {state.result.saltati.length > 0 && (
+                <div>
+                  <p className={SECTION_LABEL}>Righe saltate</p>
+                  <ul className="max-h-32 overflow-auto space-y-1 rounded-md border border-border bg-muted p-2">
+                    {state.result.saltati.map(s => (
+                      <li key={s.row_num} className="text-xs">
+                        <span className="font-medium text-foreground">Riga {s.row_num}:</span>{' '}
+                        <span className="text-muted-foreground">{s.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+          {state.phase === 'preview' && (
+            <>
+              <button onClick={onClose} className={BTN_MUTED}>Annulla</button>
+              <button
+                onClick={onConfirm}
+                disabled={state.preview.valide === 0}
+                className={BTN_PRIMARY}
+              >
+                Importa {state.preview.valide} moviment{state.preview.valide === 1 ? 'o' : 'i'}
+              </button>
+            </>
+          )}
+          {state.phase === 'done' && (
+            <button onClick={onClose} className={BTN_PRIMARY}>Chiudi</button>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── main screen ──────────────────────────────────────────────────────────────
 
 export default function ImpostazioniScreen() {
@@ -179,7 +351,8 @@ export default function ImpostazioniScreen() {
   const [saldoData, setSaldoData] = useState('');
   const [prefStatus, setPrefStatus] = useState<StatusMsg | null>(null);
   const [dataStatus, setDataStatus] = useState<StatusMsg | null>(null);
-  const [loadingOp, setLoadingOp] = useState<'csv' | 'json' | 'import' | null>(null);
+  const [loadingOp, setLoadingOp] = useState<'csv' | 'json' | 'import' | 'importCsv' | null>(null);
+  const [importCsvModal, setImportCsvModal] = useState<ImportCsvState | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -255,6 +428,33 @@ export default function ImpostazioniScreen() {
     }
   }
 
+  async function handleImportCsv() {
+    setLoadingOp('importCsv');
+    setDataStatus(null);
+    try {
+      const preview = await window.electronAPI.fileOps.importCsvPreview();
+      if (!preview) return;
+      setImportCsvModal({ phase: 'preview', preview });
+    } catch (err) {
+      setDataStatus({ type: 'error', text: `Errore analisi CSV: ${String(err)}` });
+    } finally {
+      setLoadingOp(null);
+    }
+  }
+
+  async function handleImportCsvConfirm() {
+    if (!importCsvModal || importCsvModal.phase !== 'preview') return;
+    const { filePath } = importCsvModal.preview;
+    setImportCsvModal({ phase: 'executing' });
+    try {
+      const result = await window.electronAPI.fileOps.importCsvExecute(filePath);
+      setImportCsvModal({ phase: 'done', result });
+    } catch (err) {
+      setImportCsvModal(null);
+      setDataStatus({ type: 'error', text: `Errore import CSV: ${String(err)}` });
+    }
+  }
+
   const categorieItems: EntityItem[] = categorie.map((c: Categoria) => ({
     id: c.id,
     nome: c.nome,
@@ -269,6 +469,13 @@ export default function ImpostazioniScreen() {
 
   return (
     <div className="flex h-full flex-col">
+      {importCsvModal && (
+        <ImportCsvModal
+          state={importCsvModal}
+          onConfirm={() => { void handleImportCsvConfirm(); }}
+          onClose={() => setImportCsvModal(null)}
+        />
+      )}
       <header className="border-b border-border px-6 py-3">
         <h1 className="text-base font-semibold text-foreground">Impostazioni</h1>
       </header>
@@ -322,6 +529,7 @@ export default function ImpostazioniScreen() {
                   { key: 'csv' as const, idle: 'Esporta CSV', busy: 'Esportazione…', action: handleExportCsv },
                   { key: 'json' as const, idle: 'Esporta JSON', busy: 'Esportazione…', action: handleExportJson },
                   { key: 'import' as const, idle: 'Importa database', busy: 'Importazione…', action: handleImportDb },
+                  { key: 'importCsv' as const, idle: 'Importa CSV', busy: 'Analisi…', action: handleImportCsv },
                 ] as const
               ).map(({ key, idle, busy, action }) => (
                 <button
