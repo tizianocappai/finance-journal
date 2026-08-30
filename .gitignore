@@ -7,3 +7,5 @@ build/
 .idea/
 *.db
 Claude.local.md
+node_modules/
+.claude/worktrees/

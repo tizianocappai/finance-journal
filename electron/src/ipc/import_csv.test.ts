@@ -5,6 +5,7 @@ import path from 'node:path';
 import type Database from 'better-sqlite3';
 import { initDatabase } from '../db/index';
 import { previewCsv, executeCsv } from './import_csv';
+import { listMovimenti } from './movimenti';
 
 let db: Database.Database;
 let tmpDir: string;
@@ -202,6 +203,25 @@ describe('executeCsv', () => {
     executeCsv(db, p);
     const d = db.prepare("SELECT * FROM dettagli WHERE nome = 'SubDettaglio'").get();
     expect(d).toBeTruthy();
+  });
+
+  it('Dettaglio CSV → dettaglio_id impostato sul movimento e dettaglio_nome visibile via listMovimenti', () => {
+    const p = writeCsv('det_id_check.csv', [
+      'Data,Tipo,Importo,Dettaglio',
+      '2024-01-01,entrata,500,LoopDettaglio',
+    ]);
+    executeCsv(db, p);
+
+    // verifica che dettaglio_id sia scritto sulla riga movimenti
+    const mov = db.prepare('SELECT dettaglio_id FROM movimenti LIMIT 1').get() as { dettaglio_id: number | null };
+    const det = db.prepare("SELECT id FROM dettagli WHERE nome = 'LoopDettaglio'").get() as { id: number } | undefined;
+    expect(det).toBeTruthy();
+    expect(mov.dettaglio_id).toBe(det!.id);
+
+    // verifica che il JOIN in listMovimenti restituisca dettaglio_nome
+    const rows = listMovimenti(db);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].dettaglio_nome).toBe('LoopDettaglio');
   });
 
   it('riga duplicata stessa data/importo → importata (no deduplicazione)', () => {
