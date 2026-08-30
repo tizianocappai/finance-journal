@@ -69,6 +69,16 @@ function hasColumn(db: Database.Database, table: string, column: string): boolea
   return cols.some((c) => c.name === column);
 }
 
+// Migration v2: aggiunge descrizione a movimenti (colonna assente nei DB creati prima che venisse aggiunta allo schema)
+function migrateToV2(db: Database.Database): void {
+  db.transaction(() => {
+    if (!hasColumn(db, 'movimenti', 'descrizione')) {
+      db.exec(`ALTER TABLE movimenti ADD COLUMN descrizione TEXT`);
+    }
+    db.pragma('user_version = 2');
+  })();
+}
+
 // Migration v1: aggiunge predefinita/predefinito, riscrive dettagli come lookup, aggiunge dettaglio_id a movimenti
 function migrateToV1(db: Database.Database): void {
   db.transaction(() => {
@@ -199,6 +209,9 @@ export function initDatabase(dbPath?: string): Database.Database {
     const version = db.pragma('user_version', { simple: true }) as number;
     if (version < 1) {
       migrateToV1(db);
+    }
+    if (version < 2) {
+      migrateToV2(db);
     }
   } catch (err) {
     db.close();

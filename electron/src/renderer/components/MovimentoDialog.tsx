@@ -104,6 +104,7 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
   const [creatingCategoria, setCreatingCategoria] = useState(false);
   const [nuovaCategoriaInput, setNuovaCategoriaInput] = useState('');
   const [addingCategoria, setAddingCategoria] = useState(false);
+  const [categoriaOverride, setCategoriaOverride] = useState(false);
 
   const [creatingMetodo, setCreatingMetodo] = useState(false);
   const [nuovoMetodoInput, setNuovoMetodoInput] = useState('');
@@ -118,6 +119,7 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
       setConfirmDelete(false);
       setCreatingCategoria(false);
       setNuovaCategoriaInput('');
+      setCategoriaOverride(false);
       setCreatingMetodo(false);
       setNuovoMetodoInput('');
       syncCategorie();
@@ -271,36 +273,6 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
             </div>
           </div>
 
-          {/* Categoria */}
-          <div>
-            <label htmlFor="f-categoria" className={LABEL_CLS}>Categoria</label>
-            <select
-              id="f-categoria"
-              name="categoria_id"
-              value={creatingCategoria ? '__new__' : (form.categoria_id || '')}
-              onChange={(e) => {
-                if (e.target.value === '__new__') { setCreatingCategoria(true); }
-                else { setCreatingCategoria(false); patch('categoria_id', e.target.value); }
-              }}
-              className={FIELD_CLS}
-            >
-              <option value="">— Nessuna —</option>
-              {categorie.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              <option value="__new__">+ Nuova categoria…</option>
-            </select>
-            {creatingCategoria && (
-              <InlineCreator
-                value={nuovaCategoriaInput}
-                onChange={setNuovaCategoriaInput}
-                onAdd={handleAddCategoria}
-                onCancel={() => { setCreatingCategoria(false); setNuovaCategoriaInput(''); }}
-                adding={addingCategoria}
-                placeholder="Nome categoria"
-                error={errors._nuovaCategoria}
-              />
-            )}
-          </div>
-
           {/* Dettaglio */}
           <div>
             <label htmlFor="f-dettaglio" className={LABEL_CLS}>
@@ -320,7 +292,7 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
                   ...(hasCategoria ? { categoria_id: String(det!.categoria_id) } : {}),
                 }));
                 if (errors.dettaglio_id) setErrors((e) => { const next = { ...e }; delete next.dettaglio_id; return next; });
-                if (hasCategoria) setCreatingCategoria(false);
+                if (hasCategoria) { setCreatingCategoria(false); setCategoriaOverride(false); }
               }}
               className={FIELD_CLS}
             >
@@ -328,6 +300,71 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
               {dettagli.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
             </select>
           </div>
+
+          {/* Categoria — derivata dal dettaglio, modificabile solo su override esplicito */}
+          {(() => {
+            const selectedDet = dettagli.find((d) => String(d.id) === form.dettaglio_id);
+            const derivata = selectedDet?.categoria_id != null && !categoriaOverride;
+            const catNome = derivata
+              ? (categorie.find((c) => c.id === selectedDet!.categoria_id)?.nome ?? '—')
+              : null;
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label htmlFor="f-categoria" className={LABEL_CLS + ' mb-0'}>Categoria</label>
+                  {derivata && (
+                    <button
+                      type="button"
+                      onClick={() => setCategoriaOverride(true)}
+                      className="text-xs text-muted-foreground underline hover:text-foreground"
+                    >
+                      Modifica
+                    </button>
+                  )}
+                  {categoriaOverride && selectedDet?.categoria_id != null && (
+                    <button
+                      type="button"
+                      onClick={() => { setCategoriaOverride(false); patch('categoria_id', String(selectedDet.categoria_id)); }}
+                      className="text-xs text-muted-foreground underline hover:text-foreground"
+                    >
+                      Ripristina
+                    </button>
+                  )}
+                </div>
+                {derivata ? (
+                  <div className={FIELD_CLS + ' text-muted-foreground cursor-default'}>{catNome}</div>
+                ) : (
+                  <>
+                    <select
+                      id="f-categoria"
+                      name="categoria_id"
+                      value={creatingCategoria ? '__new__' : (form.categoria_id || '')}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') { setCreatingCategoria(true); }
+                        else { setCreatingCategoria(false); patch('categoria_id', e.target.value); }
+                      }}
+                      className={FIELD_CLS}
+                    >
+                      <option value="">— Nessuna —</option>
+                      {categorie.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                      <option value="__new__">+ Nuova categoria…</option>
+                    </select>
+                    {creatingCategoria && (
+                      <InlineCreator
+                        value={nuovaCategoriaInput}
+                        onChange={setNuovaCategoriaInput}
+                        onAdd={handleAddCategoria}
+                        onCancel={() => { setCreatingCategoria(false); setNuovaCategoriaInput(''); }}
+                        adding={addingCategoria}
+                        placeholder="Nome categoria"
+                        error={errors._nuovaCategoria}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Metodo */}
           <div>
