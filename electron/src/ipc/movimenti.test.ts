@@ -7,6 +7,7 @@ import {
   updateMovimento,
   deleteMovimento,
   restoreMovimento,
+  deleteAllMovimenti,
 } from './movimenti';
 import type { Movimento } from './types';
 import { listCategorie } from './categorie';
@@ -237,5 +238,81 @@ describe('restoreMovimento', () => {
     const all = listMovimenti(db);
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe(9999);
+  });
+});
+
+describe('deleteAllMovimenti', () => {
+  beforeEach(() => {
+    const { cat, metodo } = seed(db);
+    createMovimento(db, { data: '2024-01-10', importo: 100, tipo: 'entrata', descrizione: 'Stipendio', categoria_id: cat.id, metodo_id: metodo.id });
+    createMovimento(db, { data: '2024-01-20', importo: 30,  tipo: 'uscita',  descrizione: 'Spesa supermercato' });
+    createMovimento(db, { data: '2024-02-05', importo: 15,  tipo: 'uscita',  descrizione: 'Caffè' });
+    createMovimento(db, { data: '2025-01-01', importo: 200, tipo: 'entrata', descrizione: 'Bonus anno nuovo' });
+  });
+
+  it('senza filtri elimina tutti e restituisce tutti i movimenti', () => {
+    const deleted = deleteAllMovimenti(db);
+    expect(deleted).toHaveLength(4);
+    expect(listMovimenti(db)).toHaveLength(0);
+  });
+
+  it('filtra per anno → elimina solo quell\'anno', () => {
+    const deleted = deleteAllMovimenti(db, { anno: 2024 });
+    expect(deleted).toHaveLength(3);
+    deleted.forEach((m) => expect(m.data.startsWith('2024')).toBe(true));
+    const remaining = listMovimenti(db);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].data.startsWith('2025')).toBe(true);
+  });
+
+  it('filtra per tipo uscita → elimina solo uscite', () => {
+    const deleted = deleteAllMovimenti(db, { tipo: 'uscita' });
+    expect(deleted).toHaveLength(2);
+    deleted.forEach((m) => expect(m.tipo).toBe('uscita'));
+    const remaining = listMovimenti(db);
+    expect(remaining).toHaveLength(2);
+    remaining.forEach((m) => expect(m.tipo).toBe('entrata'));
+  });
+
+  it('filtra per testo → elimina solo matching', () => {
+    const deleted = deleteAllMovimenti(db, { testo: 'Stipendio' });
+    expect(deleted).toHaveLength(1);
+    expect(deleted[0].descrizione).toBe('Stipendio');
+    expect(listMovimenti(db)).toHaveLength(3);
+  });
+
+  it('filtra per categoria_id → elimina solo matching', () => {
+    const { cat } = seed(db);
+    const deleted = deleteAllMovimenti(db, { categoria_id: cat.id });
+    expect(deleted).toHaveLength(1);
+    expect(deleted[0].categoria_id).toBe(cat.id);
+    expect(listMovimenti(db)).toHaveLength(3);
+  });
+
+  it('filtra per metodo_id → elimina solo matching', () => {
+    const { metodo } = seed(db);
+    const deleted = deleteAllMovimenti(db, { metodo_id: metodo.id });
+    expect(deleted).toHaveLength(1);
+    expect(deleted[0].metodo_id).toBe(metodo.id);
+    expect(listMovimenti(db)).toHaveLength(3);
+  });
+
+  it('restituisce array vuoto se nessun match', () => {
+    const deleted = deleteAllMovimenti(db, { testo: 'xyz_nessun_match' });
+    expect(deleted).toHaveLength(0);
+    expect(listMovimenti(db)).toHaveLength(4);
+  });
+
+  it('i movimenti eliminati contengono tutti i campi necessari per restore', () => {
+    const { cat, metodo } = seed(db);
+    const deleted = deleteAllMovimenti(db, { testo: 'Stipendio' });
+    expect(deleted[0].id).toBeTypeOf('number');
+    expect(deleted[0].data).toBe('2024-01-10');
+    expect(deleted[0].importo).toBe(100);
+    expect(deleted[0].tipo).toBe('entrata');
+    expect(deleted[0].categoria_id).toBe(cat.id);
+    expect(deleted[0].metodo_id).toBe(metodo.id);
+    expect(deleted[0].created_at).toBeTruthy();
+    expect(deleted[0].updated_at).toBeTruthy();
   });
 });

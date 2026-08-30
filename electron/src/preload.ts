@@ -35,6 +35,8 @@ try {
         ipcRenderer.invoke('movimenti:delete', { id }),
       restore: (movimento: Movimento) =>
         ipcRenderer.invoke('movimenti:restore', movimento),
+      deleteAll: (filters: MovimentoFilters = {}) =>
+        ipcRenderer.invoke('movimenti:deleteAll', filters),
     },
     dashboard: {
       kpi: (anno: number) => ipcRenderer.invoke('dashboard:kpi', { anno }),

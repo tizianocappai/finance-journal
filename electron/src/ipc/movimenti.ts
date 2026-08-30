@@ -140,6 +140,52 @@ export function deleteMovimento(db: Database.Database, id: number): void {
   }
 }
 
+export function deleteAllMovimenti(
+  db: Database.Database,
+  filters: MovimentoFilters = {},
+): Movimento[] {
+  try {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (filters.anno != null) {
+      conditions.push(`strftime('%Y', data) = ?`);
+      params.push(String(filters.anno));
+    }
+    if (filters.mese != null) {
+      conditions.push(`strftime('%m', data) = ?`);
+      params.push(String(filters.mese).padStart(2, '0'));
+    }
+    if (filters.tipo) {
+      conditions.push(`tipo = ?`);
+      params.push(filters.tipo);
+    }
+    if (filters.categoria_id != null) {
+      conditions.push(`categoria_id = ?`);
+      params.push(filters.categoria_id);
+    }
+    if (filters.metodo_id != null) {
+      conditions.push(`metodo_id = ?`);
+      params.push(filters.metodo_id);
+    }
+    if (filters.testo) {
+      conditions.push(`descrizione LIKE ?`);
+      params.push(`%${filters.testo}%`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const execute = db.transaction(() => {
+      const rows = db.prepare(`SELECT * FROM movimenti ${where}`).all(...params) as Movimento[];
+      db.prepare(`DELETE FROM movimenti ${where}`).run(...params);
+      return rows;
+    });
+    return execute();
+  } catch (err) {
+    throw new Error(`Failed to delete all movimenti: ${String(err)}`);
+  }
+}
+
 export function restoreMovimento(db: Database.Database, movimento: Movimento): void {
   try {
     db

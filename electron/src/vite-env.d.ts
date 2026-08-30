@@ -40,6 +40,7 @@ declare global {
         update: (id: number, data: MovimentoUpdate) => Promise<Movimento>;
         delete: (id: number) => Promise<void>;
         restore: (movimento: Movimento) => Promise<void>;
+        deleteAll: (filters?: MovimentoFilters) => Promise<Movimento[]>;
       };
       dashboard: {
         kpi: (anno: number) => Promise<DashboardKPI>;

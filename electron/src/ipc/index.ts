@@ -15,6 +15,7 @@ import {
   updateMovimento,
   deleteMovimento,
   restoreMovimento,
+  deleteAllMovimenti,
 } from './movimenti';
 import {
   getDashboardKPI,
@@ -130,6 +131,9 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('movimenti:restore', (_e, movimento: Movimento) =>
     restoreMovimento(db, movimento),
+  );
+  ipcMain.handle('movimenti:deleteAll', (_e, filters: MovimentoFilters = {}) =>
+    deleteAllMovimenti(db, filters),
   );
 
   ipcMain.handle('dashboard:kpi', (_e, { anno }: { anno: number }) =>

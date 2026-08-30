@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, ICellRendererParams, RowDoubleClickedEvent, ValueFormatterParams } from 'ag-grid-community';
-import { Inbox, Plus, X } from 'lucide-react';
+import { Inbox, Plus, Trash2, X } from 'lucide-react';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
 import { getAgGridTheme } from '@/lib/ag-theme';
 import { useMovimentiStore } from '@/stores/movimenti';
@@ -80,12 +80,14 @@ export default function MovimentiScreen() {
   const isDark = getResolvedTheme(theme) === 'dark';
   const gridTheme = useMemo(() => getAgGridTheme(isDark), [isDark]);
 
-  const { movimenti, filters, loading, fetch, setFilter, resetFilters } = useMovimentiStore();
+  const { movimenti, filters, loading, fetch, setFilter, resetFilters, deleteAll } = useMovimentiStore();
   const { categorie, metodi, syncCategorie, syncMetodi } = useLookupStore();
   const [testoInput, setTestoInput] = useState(filters.testo ?? '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [dialog, setDialog] = useState<DialogState>({ open: false });
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   useEffect(() => {
     fetch();
@@ -108,6 +110,18 @@ export default function MovimentiScreen() {
   function handleReset() {
     setTestoInput('');
     resetFilters();
+  }
+
+  async function handleConfirmDeleteAll() {
+    setDeletingAll(true);
+    try {
+      await deleteAll();
+    } catch {
+      // error surfaced via store.error
+    } finally {
+      setDeletingAll(false);
+      setConfirmDeleteAll(false);
+    }
   }
 
   const colDefs = useMemo<ColDef<MovimentoWithLookup>[]>(
@@ -176,6 +190,46 @@ export default function MovimentiScreen() {
       movimento={dialog.open && dialog.mode === 'edit' ? dialog.movimento : undefined}
       onClose={() => setDialog({ open: false })}
     />
+
+    {confirmDeleteAll && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-delete-all-title"
+      >
+        <div className="w-full max-w-sm rounded-lg border border-border bg-background p-6 shadow-lg">
+          <h2 id="confirm-delete-all-title" className="text-sm font-semibold text-foreground">
+            Conferma eliminazione
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Stai per eliminare{' '}
+            <span className="font-medium text-foreground">
+              {movimenti.length} {movimenti.length === 1 ? 'movimento' : 'movimenti'}
+            </span>
+            . L&apos;operazione può essere annullata tramite il toast.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={() => setConfirmDeleteAll(false)}
+              disabled={deletingAll}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleConfirmDeleteAll}
+              disabled={deletingAll}
+              className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            >
+              <Trash2 size={12} aria-hidden />
+              {deletingAll ? 'Eliminazione…' : 'Elimina'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="flex h-full flex-col gap-4">
       {/* Header + filtri */}
       <div className="flex flex-wrap items-center gap-2">
@@ -188,6 +242,16 @@ export default function MovimentiScreen() {
           <Plus size={13} aria-hidden />
           Nuovo movimento
         </button>
+        {movimenti.length > 0 && (
+          <button
+            onClick={() => setConfirmDeleteAll(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-destructive/60 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Elimina movimenti mostrati"
+          >
+            <Trash2 size={13} aria-hidden />
+            Elimina mostrati
+          </button>
+        )}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <select
