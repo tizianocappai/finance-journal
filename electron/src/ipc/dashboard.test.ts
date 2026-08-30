@@ -324,6 +324,31 @@ describe('getRiepilogoMensile', () => {
     const expectedMediana = (sortedSaldos[5] + sortedSaldos[6]) / 2;
     expect(result.mediana.saldo).toBeCloseTo(expectedMediana, 5);
   });
+
+  it('media footer: divide per i mesi trascorsi, non per 12', () => {
+    seed();
+    const ora = new Date(2024, 7, 15);
+    const result = getRiepilogoMensile(db, 2024, ora);
+    // 8 mesi trascorsi (gen–ago); totale.saldo = 1900
+    expect(result.media.saldo).toBeCloseTo(1900 / 8, 5);
+  });
+
+  it('mediana footer: considera solo i mesi trascorsi', () => {
+    for (let i = 1; i <= 8; i++) {
+      createMovimento(db, { data: `2024-0${i}-10`, importo: i * 100, tipo: 'entrata' });
+    }
+    const ora = new Date(2024, 7, 15);
+    const result = getRiepilogoMensile(db, 2024, ora);
+    // valori considerati [100,200,...,800], mediana = (400+500)/2
+    expect(result.mediana.entrate).toBeCloseTo(450, 5);
+  });
+
+  it("anno passato: media resta /12 anche se la data odierna è in un anno successivo", () => {
+    seed();
+    const ora = new Date(2026, 0, 10);
+    const result = getRiepilogoMensile(db, 2024, ora);
+    expect(result.media.saldo).toBeCloseTo(1900 / 12, 5);
+  });
 });
 
 describe('getPivotCategorie', () => {
@@ -415,6 +440,36 @@ describe('getPivotCategorie', () => {
     createMovimento(db, { data: '2023-05-10', importo: 999, tipo: 'uscita', categoria_id: ali.id });
 
     expect(getPivotCategorie(db, 2024, 'uscita')).toHaveLength(0);
+  });
+
+  it('media riga: divide per i mesi trascorsi, non per 12', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    createMovimento(db, { data: '2024-01-10', importo: 400, tipo: 'uscita', categoria_id: ali.id });
+
+    const ora = new Date(2024, 7, 15);
+    const pivot = getPivotCategorie(db, 2024, 'uscita', ora);
+    const row = pivot.find((r) => r.categoria === 'Alimentari')!;
+    expect(row.media).toBeCloseTo(400 / 8, 5);
+  });
+
+  it('mediana riga: esclude i mesi non trascorsi', () => {
+    const categorie = listCategorie(db);
+    const ali = categorie.find((c) => c.nome === 'Alimentari')!;
+    for (let i = 1; i <= 8; i++) {
+      createMovimento(db, {
+        data: `2024-${String(i).padStart(2, '0')}-10`,
+        importo: i * 100,
+        tipo: 'uscita',
+        categoria_id: ali.id,
+      });
+    }
+
+    const ora = new Date(2024, 7, 15);
+    const pivot = getPivotCategorie(db, 2024, 'uscita', ora);
+    const row = pivot.find((r) => r.categoria === 'Alimentari')!;
+    // valori considerati [100,200,...,800], mediana = (400+500)/2
+    expect(row.mediana).toBeCloseTo(450, 5);
   });
 });
 

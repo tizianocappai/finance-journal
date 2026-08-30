@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { initDatabase } from '../db/index';
-import type Database from 'better-sqlite3';
+import Database from 'better-sqlite3';
 import {
   listMovimenti,
   createMovimento,
@@ -56,6 +56,32 @@ describe('createMovimento', () => {
     expect(mov.descrizione).toBe('Stipendio');
     expect(mov.categoria_id).toBe(cat.id);
     expect(mov.metodo_id).toBe(metodo.id);
+  });
+
+  it('su DB migrato da Python (DEFAULT "" per created_at/updated_at) valorizza i timestamp', () => {
+    const raw = new Database(':memory:');
+    try {
+      raw.exec(`
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE movimenti (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          data         TEXT    NOT NULL,
+          importo      REAL    NOT NULL,
+          tipo         TEXT    NOT NULL CHECK (tipo IN ('entrata', 'uscita')),
+          descrizione  TEXT,
+          categoria_id INTEGER,
+          metodo_id    INTEGER,
+          dettaglio_id INTEGER,
+          created_at   TEXT    NOT NULL DEFAULT '',
+          updated_at   TEXT    NOT NULL DEFAULT ''
+        );
+      `);
+      const mov = createMovimento(raw, { data: '2024-03-15', importo: 50, tipo: 'uscita' });
+      expect(mov.created_at).toBeTruthy();
+      expect(mov.updated_at).toBeTruthy();
+    } finally {
+      raw.close();
+    }
   });
 });
 

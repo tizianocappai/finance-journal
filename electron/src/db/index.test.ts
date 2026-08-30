@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { getDbPath, initDatabase, DB_FILENAME, LEGACY_DB_FILENAME } from './index';
+import { updateMovimento } from '../ipc/movimenti';
 
 const EXPECTED_TABLES = [
   'movimenti',
@@ -176,6 +177,68 @@ describe('initDatabase — compatibilità DB Python', () => {
       const db = initDatabase(dbPath);
       db.close();
     }).not.toThrow();
+  });
+
+  it('migrateToV3: updateMovimento non lancia "no such column: updated_at" su DB Python senza quella colonna', () => {
+    // Riproduce un DB Python con schema che non ha updated_at in movimenti.
+    // Prima del fix, UPDATE ... SET updated_at = ... lanciava SqliteError.
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const Database = require('better-sqlite3');
+    const seed = new Database(dbPath);
+    seed.exec(`
+      PRAGMA foreign_keys = ON;
+      CREATE TABLE categorie (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        predefinita INTEGER NOT NULL DEFAULT 0,
+        colore TEXT,
+        icona TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE metodi_pagamento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        predefinito INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE dettagli (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        categoria_id INTEGER REFERENCES categorie(id),
+        predefinito INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE movimenti (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data TEXT NOT NULL,
+        tipo TEXT NOT NULL CHECK(tipo IN ('entrata', 'uscita')),
+        importo REAL NOT NULL,
+        categoria_id INTEGER REFERENCES categorie(id),
+        metodo_id INTEGER REFERENCES metodi_pagamento(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE impostazioni (chiave TEXT PRIMARY KEY, valore TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')));
+      INSERT INTO categorie (nome) VALUES ('Alimentari');
+      INSERT INTO metodi_pagamento (nome) VALUES ('Contanti');
+      INSERT INTO movimenti (data, tipo, importo, categoria_id, metodo_id)
+        VALUES ('2024-01-01', 'uscita', 50.0, 1, 1);
+    `);
+    seed.close();
+
+    const db = initDatabase(dbPath);
+    try {
+      expect(() => {
+        updateMovimento(db, 1, {
+          data: '2024-06-15',
+          importo: 50.0,
+          tipo: 'uscita',
+          categoria_id: 1,
+          metodo_id: 1,
+        });
+      }).not.toThrow();
+    } finally {
+      db.close();
+    }
   });
 });
 

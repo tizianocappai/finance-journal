@@ -79,6 +79,21 @@ function migrateToV2(db: Database.Database): void {
   })();
 }
 
+// Migration v3: aggiunge updated_at e created_at a movimenti (assenti nei DB creati dallo stack Python).
+// SQLite non ammette DEFAULT (datetime('now')) in ALTER TABLE, quindi si usa '' come placeholder
+// per le righe storiche; tutte le scritture future impostano il valore tramite SQL.
+function migrateToV3(db: Database.Database): void {
+  db.transaction(() => {
+    if (!hasColumn(db, 'movimenti', 'created_at')) {
+      db.exec(`ALTER TABLE movimenti ADD COLUMN created_at TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!hasColumn(db, 'movimenti', 'updated_at')) {
+      db.exec(`ALTER TABLE movimenti ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''`);
+    }
+    db.pragma('user_version = 3');
+  })();
+}
+
 // Migration v1: aggiunge predefinita/predefinito, riscrive dettagli come lookup, aggiunge dettaglio_id a movimenti
 function migrateToV1(db: Database.Database): void {
   db.transaction(() => {
@@ -212,6 +227,9 @@ export function initDatabase(dbPath?: string): Database.Database {
     }
     if (version < 2) {
       migrateToV2(db);
+    }
+    if (version < 3) {
+      migrateToV3(db);
     }
   } catch (err) {
     db.close();

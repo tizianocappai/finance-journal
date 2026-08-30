@@ -103,6 +103,7 @@ export function getBreakdownCategorie(db: Database.Database, anno: number): Brea
 }
 
 function mediana(values: number[]): number {
+  if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0
@@ -110,7 +111,13 @@ function mediana(values: number[]): number {
     : sorted[mid];
 }
 
-export function getRiepilogoMensile(db: Database.Database, anno: number): RiepilogoMensileResult {
+function mesiTrascorsi(anno: number, ora: Date): number {
+  if (anno < ora.getFullYear()) return 12;
+  if (anno > ora.getFullYear()) return 0;
+  return ora.getMonth() + 1;
+}
+
+export function getRiepilogoMensile(db: Database.Database, anno: number, ora: Date = new Date()): RiepilogoMensileResult {
   try {
     const rows = db
       .prepare(
@@ -146,16 +153,19 @@ export function getRiepilogoMensile(db: Database.Database, anno: number): Riepil
       { entrate: 0, uscite: 0, saldo: 0 },
     );
 
+    const mesiDaConsiderare = mesiTrascorsi(anno, ora);
+    const righeConsiderate = righe.slice(0, mesiDaConsiderare);
+
     const media = {
-      entrate: totale.entrate / 12,
-      uscite: totale.uscite / 12,
-      saldo: totale.saldo / 12,
+      entrate: mesiDaConsiderare > 0 ? totale.entrate / mesiDaConsiderare : 0,
+      uscite: mesiDaConsiderare > 0 ? totale.uscite / mesiDaConsiderare : 0,
+      saldo: mesiDaConsiderare > 0 ? totale.saldo / mesiDaConsiderare : 0,
     };
 
     const medianaVal = {
-      entrate: mediana(righe.map((r) => r.entrate)),
-      uscite: mediana(righe.map((r) => r.uscite)),
-      saldo: mediana(righe.map((r) => r.saldo)),
+      entrate: mediana(righeConsiderate.map((r) => r.entrate)),
+      uscite: mediana(righeConsiderate.map((r) => r.uscite)),
+      saldo: mediana(righeConsiderate.map((r) => r.saldo)),
     };
 
     return { righe, totale, media, mediana: medianaVal };
@@ -168,6 +178,7 @@ export function getPivotCategorie(
   db: Database.Database,
   anno: number,
   tipo: 'uscita' | 'entrata',
+  ora: Date = new Date(),
 ): PivotCategoriaRiga[] {
   try {
     const rows = db
@@ -192,14 +203,16 @@ export function getPivotCategorie(
       map.get(r.categoria)![r.mese - 1] += r.importo;
     }
 
+    const mesiDaConsiderare = mesiTrascorsi(anno, ora);
+
     return Array.from(map.entries()).map(([categoria, mesi]) => {
       const totale = mesi.reduce((acc, v) => acc + v, 0);
       return {
         categoria,
         mesi,
         totale,
-        media: totale / 12,
-        mediana: mediana(mesi),
+        media: mesiDaConsiderare > 0 ? totale / mesiDaConsiderare : 0,
+        mediana: mediana(mesi.slice(0, mesiDaConsiderare)),
       };
     });
   } catch (err) {

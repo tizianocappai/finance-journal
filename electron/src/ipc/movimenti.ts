@@ -69,8 +69,8 @@ export function createMovimento(
   try {
     const row = db
       .prepare(
-        `INSERT INTO movimenti (data, importo, tipo, descrizione, categoria_id, metodo_id, dettaglio_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO movimenti (data, importo, tipo, descrizione, categoria_id, metodo_id, dettaglio_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
          RETURNING *`,
       )
       .get(
