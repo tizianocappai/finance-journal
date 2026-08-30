@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY } from './types';
+import { getSaldoIniziale } from './impostazioni';
 
 const NOMI_MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 
@@ -31,10 +32,12 @@ export function getDashboardKPI(db: Database.Database, anno: number): DashboardK
       )
       .get(annoPad) as { cnt: number };
 
+    const saldoIniziale = getSaldoIniziale(db, anno);
+
     return {
       entrate: row.entrate,
       uscite: row.uscite,
-      saldo: row.entrate - row.uscite,
+      saldo: row.entrate - row.uscite + saldoIniziale,
       mesi_in_rosso: cnt,
     };
   } catch (err) {

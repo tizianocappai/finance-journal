@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { initDatabase } from '../db/index';
 import type Database from 'better-sqlite3';
-import { getImpostazione, setImpostazione } from './impostazioni';
+import { getImpostazione, setImpostazione, getSaldoIniziale } from './impostazioni';
 
 let db: Database.Database;
 
@@ -47,5 +47,41 @@ describe('setImpostazione', () => {
     setImpostazione(db, 'saldo_iniziale_importo', '500');
     expect(getImpostazione(db, 'valuta')).toBe('EUR');
     expect(getImpostazione(db, 'saldo_iniziale_importo')).toBe('500');
+  });
+});
+
+describe('getSaldoIniziale', () => {
+  it('restituisce 0 senza impostazioni', () => {
+    expect(getSaldoIniziale(db, 2024)).toBe(0);
+  });
+
+  it('include saldo se anno data <= anno', () => {
+    setImpostazione(db, 'saldo_iniziale_importo', '1000');
+    setImpostazione(db, 'saldo_iniziale_data', '2023-01-01');
+    expect(getSaldoIniziale(db, 2024)).toBe(1000);
+  });
+
+  it('esclude saldo se anno data > anno', () => {
+    setImpostazione(db, 'saldo_iniziale_importo', '1000');
+    setImpostazione(db, 'saldo_iniziale_data', '2025-06-01');
+    expect(getSaldoIniziale(db, 2024)).toBe(0);
+  });
+
+  it('include saldo se anno data == anno', () => {
+    setImpostazione(db, 'saldo_iniziale_importo', '500');
+    setImpostazione(db, 'saldo_iniziale_data', '2024-12-31');
+    expect(getSaldoIniziale(db, 2024)).toBe(500);
+  });
+
+  it('restituisce 0 per importo non numerico', () => {
+    setImpostazione(db, 'saldo_iniziale_importo', 'abc');
+    setImpostazione(db, 'saldo_iniziale_data', '2023-01-01');
+    expect(getSaldoIniziale(db, 2024)).toBe(0);
+  });
+
+  it('restituisce 0 per data malformata', () => {
+    setImpostazione(db, 'saldo_iniziale_importo', '1000');
+    setImpostazione(db, 'saldo_iniziale_data', 'bad');
+    expect(getSaldoIniziale(db, 2024)).toBe(0);
   });
 });

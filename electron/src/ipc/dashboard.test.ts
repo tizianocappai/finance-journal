@@ -9,6 +9,7 @@ import {
 } from './dashboard';
 import { createMovimento } from './movimenti';
 import { listCategorie } from './categorie';
+import { setImpostazione } from './impostazioni';
 
 let db: Database.Database;
 
@@ -72,6 +73,39 @@ describe('getDashboardKPI', () => {
     expect(kpi.uscite).toBe(600);
     expect(kpi.saldo).toBe(1200);
     expect(kpi.mesi_in_rosso).toBe(0);
+  });
+
+  it('include saldo_iniziale se data <= anno', () => {
+    seed();
+    setImpostazione(db, 'saldo_iniziale_importo', '1000');
+    setImpostazione(db, 'saldo_iniziale_data', '2023-01-01');
+    const kpi = getDashboardKPI(db, 2024);
+    // saldo transazioni 2024 = 1900, + saldo_iniziale 1000 = 2900
+    expect(kpi.saldo).toBe(2900);
+    expect(kpi.entrate).toBe(3500);
+    expect(kpi.uscite).toBe(1600);
+  });
+
+  it('NON include saldo_iniziale se data > anno', () => {
+    seed();
+    setImpostazione(db, 'saldo_iniziale_importo', '1000');
+    setImpostazione(db, 'saldo_iniziale_data', '2025-06-01');
+    const kpi = getDashboardKPI(db, 2024);
+    expect(kpi.saldo).toBe(1900);
+  });
+
+  it('saldo invariato senza saldo_iniziale impostato', () => {
+    seed();
+    const kpi = getDashboardKPI(db, 2024);
+    expect(kpi.saldo).toBe(1900);
+  });
+
+  it('include saldo_iniziale se anno data == anno', () => {
+    seed();
+    setImpostazione(db, 'saldo_iniziale_importo', '500');
+    setImpostazione(db, 'saldo_iniziale_data', '2024-12-31');
+    const kpi = getDashboardKPI(db, 2024);
+    expect(kpi.saldo).toBe(2400);
   });
 });
 
