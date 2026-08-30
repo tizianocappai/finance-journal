@@ -1,45 +1,16 @@
-# Installazione — No Budget (Finance Journal)
+# Installazione — No Budget
 
-## Versione Electron (raccomandato)
+## Utenti finali
 
-L'app è disponibile come applicazione nativa per macOS, Windows e Linux tramite Electron Forge.
+Scarica il pacchetto per la tua piattaforma dalla pagina [GitHub Releases](https://github.com/tizianocappai/finance-journal/releases). Non è richiesta nessuna dipendenza aggiuntiva.
 
-### Requisiti
+### macOS (`.dmg`)
 
-- Node.js 18+
-- pnpm 8+
-
-### Installazione da sorgente
-
-```bash
-git clone https://github.com/tizianocappai/finance-journal.git
-cd finance-journal/electron
-pnpm install
-```
-
-### Avvio in modalità sviluppo
-
-```bash
-pnpm dev
-```
-
-### Build e packaging
-
-```bash
-# Produce l'artefatto per la piattaforma corrente
-pnpm make
-```
-
-Gli artefatti vengono generati nella cartella `out/make/`.
-
-### macOS — apertura del `.dmg`
-
-Il `.dmg` non è firmato con un certificato Apple Developer. Per aprirlo:
-
-1. Fai doppio clic sul `.dmg` per montarlo.
-2. Se macOS mostra "Impossibile aprire l'app perché non può essere verificata", **non usare** il pulsante predefinito.
-3. **Clic destro → Apri** sull'icona dell'app all'interno del `.dmg`.
-4. Nella finestra di dialogo, clicca **Apri** per avviare l'app.
+1. Apri il file `.dmg` scaricato.
+2. Trascina **No Budget** nella cartella `/Applications`.
+3. Se macOS mostra "Impossibile aprire l'app perché non può essere verificata":
+   - **Clic destro → Apri** sull'icona dell'app.
+   - Nella finestra di dialogo, clicca **Apri**.
 
 In alternativa, da terminale:
 
@@ -47,95 +18,87 @@ In alternativa, da terminale:
 xattr -cr /Applications/"No Budget.app"
 ```
 
-### Dove vengono salvati i dati
+### Windows (`.exe`)
 
-Il database SQLite viene creato automaticamente alla prima esecuzione:
+Esegui il file `.exe` scaricato. L'installer Squirrel installa l'app e crea un collegamento nel menu Start. Nessuna conferma UAC richiesta.
 
-| Sistema | Percorso |
-|---------|----------|
-| macOS   | `~/Library/Application Support/No Budget/finance.db` |
-| Linux   | `~/.config/No Budget/finance.db` |
-| Windows | `%APPDATA%\No Budget\finance.db` |
+### Linux (`.deb` / `.rpm`)
+
+```bash
+# Debian / Ubuntu
+sudo dpkg -i no-budget_*.deb
+
+# Fedora / RHEL
+sudo rpm -i no-budget_*.rpm
+```
 
 ---
 
-## Versione Python (legacy)
-
-### Requisiti
-
-- Python 3.11 o superiore
-- Git
-
-Verifica la versione installata:
-
-```bash
-python3 --version
-```
-
-### 1. Clona il repository
-
-```bash
-git clone https://github.com/tizianocappai/finance-journal.git
-cd finance-journal
-```
-
-### 2. Crea il virtual environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Il prompt cambierà mostrando `(.venv)` — indica che l'ambiente è attivo.
-
-### 3. Installa le dipendenze
-
-```bash
-pip install -e .
-```
-
-Questo installa l'applicazione in modalità editabile insieme a tutte le dipendenze (PyQt6, matplotlib, platformdirs).
-
-### 4. Avvia l'applicazione
-
-```bash
-finance-journal
-```
-
-In alternativa:
-
-```bash
-python -m finance_journal
-```
-
-### Dove vengono salvati i dati
+## Dove vengono salvati i dati
 
 Il database SQLite viene creato automaticamente alla prima esecuzione:
 
 | Sistema | Percorso |
 |---------|----------|
-| macOS   | `~/Library/Application Support/finance-journal/finance.db` |
-| Linux   | `~/.local/share/finance-journal/finance.db` |
+| macOS | `~/Library/Application Support/No Budget/finance.db` |
+| Linux | `~/.config/No Budget/finance.db` |
+| Windows | `%APPDATA%\No Budget\finance.db` |
 
-Non è necessario creare la cartella manualmente.
+Il file `.db` è l'unico artefatto da backuppare. Le Impostazioni dell'app espongono Export e Import del file DB per la portabilità cross-device.
 
-### Avvii successivi
+---
 
-Ogni volta che apri un nuovo terminale, riattiva il virtual environment prima di avviare l'app:
+## Developer
+
+### Requisiti
+
+- [Node.js](https://nodejs.org) LTS (18+)
+- Git
+
+### Installazione dipendenze
 
 ```bash
-source .venv/bin/activate
-finance-journal
+git clone https://github.com/tizianocappai/finance-journal.git
+cd finance-journal/electron
+npm install
 ```
 
-### Disinstallazione
-
-Elimina la cartella del progetto e, se vuoi rimuovere anche i dati:
+### Avvio in modalità sviluppo
 
 ```bash
-# macOS
-rm -rf ~/Library/Application\ Support/finance-journal
+npm run dev
+```
 
-# Linux
-rm -rf ~/.local/share/finance-journal
+### Test
+
+```bash
+# Unit test (Vitest)
+npm test
+
+# Typecheck TypeScript
+npm run typecheck
+
+# E2E test (Playwright) — richiede build prima
+npm run test:e2e
+```
+
+### Build e packaging
+
+```bash
+# Produce l'artefatto per la piattaforma corrente
+npm run make
+```
+
+Gli artefatti vengono generati in `out/make/`.
+
+### Struttura del progetto
+
+```
+electron/          ← tutto il codice dell'app
+├── src/
+│   ├── main/      ← Main Process (Node.js, accesso DB e filesystem)
+│   ├── preload/   ← IPC Bridge (ContextBridge)
+│   └── renderer/  ← Renderer Process (React + TypeScript)
+├── e2e/           ← test Playwright
+└── forge.config.ts
 ```

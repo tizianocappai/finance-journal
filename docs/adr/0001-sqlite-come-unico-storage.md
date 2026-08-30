@@ -8,7 +8,7 @@ L'app è offline-only e non espone dati a servizi esterni. I dati devono essere 
 
 ## Decisione
 
-Usare un singolo file SQLite come unico storage. Il file è gestito dalla libreria `platformdirs` per il path cross-platform corretto su ciascun OS.
+Usare un singolo file SQLite come unico storage. Il path del file è risolto da `app.getPath('userData')` di Electron per garantire il percorso cross-platform corretto su ciascun OS.
 
 ## Alternative considerate
 

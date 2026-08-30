@@ -65,7 +65,7 @@ Vista aggregata di un Anno Finanziario per una Sezione. Mostra: KPI sintetici (t
 **Firma**: nessuna per ora. Gli utenti macOS devono fare clic destro → Apri → Apri comunque (workaround Gatekeeper documentato in INSTALL.md).
 **Icona**: simbolo `€` bianco su sfondo verde scuro `#1B5E20`.
 **Distribuzione**: GitHub Releases — artefatti caricati manualmente a ogni release.
-**DB path**: `app.getPath('userData')` di Electron — equivalente cross-platform di `platformdirs`; stesso percorso OS dell'app Python.
+**DB path**: `app.getPath('userData')` di Electron — percorso cross-platform per i dati utente (Linux: `~/.config/`, macOS: `~/Library/Application Support/`, Windows: `%APPDATA%/`).
 
 ## Regole di dominio
 

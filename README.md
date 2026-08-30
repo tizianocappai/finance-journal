@@ -2,7 +2,7 @@
 
 Applicazione desktop per il tracciamento personale delle finanze. Registra entrate e uscite, visualizza dashboard annuali con grafici, importa movimenti da CSV.
 
-Sviluppata con PyQt6, dati salvati in SQLite locale — nessun cloud, nessun account.
+Sviluppata con Electron — dati salvati in SQLite locale, nessun cloud, nessun account.
 
 ---
 
@@ -18,19 +18,21 @@ Sviluppata con PyQt6, dati salvati in SQLite locale — nessun cloud, nessun acc
 
 ---
 
-## Installazione
+## Download
 
-Vedi [INSTALL.md](INSTALL.md) per istruzioni complete su clone, virtual environment e avvio.
+Scarica l'ultima versione dalla pagina [GitHub Releases](https://github.com/tizianocappai/finance-journal/releases):
 
-**Requisiti minimi:** Python 3.11+
+| Piattaforma | Formato |
+|-------------|---------|
+| macOS | `.dmg` |
+| Windows | `.exe` (Squirrel installer) |
+| Linux | `.deb` / `.rpm` |
 
-```bash
-git clone https://github.com/tizianocappai/finance-journal.git
-cd finance-journal
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .
-finance-journal
-```
+Nessuna dipendenza da installare — apri il pacchetto e avvia l'app.
+
+> **macOS**: il `.dmg` non è firmato. Se macOS blocca l'apertura, fai **clic destro → Apri** sull'icona dell'app, poi clicca **Apri** nella finestra di dialogo.
+
+Vedi [INSTALL.md](INSTALL.md) per istruzioni dettagliate su ogni piattaforma.
 
 ---
 
@@ -38,11 +40,11 @@ finance-journal
 
 | Componente | Tecnologia |
 |------------|-----------|
-| UI | PyQt6 |
-| Grafici | matplotlib |
-| Database | SQLite (locale) |
-| Packaging | Briefcase (BeeWare) |
-| Python | 3.11+ |
+| Runtime | Electron 44 |
+| UI | React + TypeScript |
+| Database | SQLite (`better-sqlite3`) |
+| Packaging | Electron Forge |
+| Test | Vitest + Playwright |
 
 ---
 
@@ -52,11 +54,43 @@ Il database SQLite viene creato automaticamente alla prima esecuzione:
 
 | Sistema | Percorso |
 |---------|----------|
-| macOS | `~/Library/Application Support/finance-journal/finance.db` |
-| Linux | `~/.local/share/finance-journal/finance.db` |
+| macOS | `~/Library/Application Support/No Budget/finance.db` |
+| Linux | `~/.config/No Budget/finance.db` |
+| Windows | `%APPDATA%\No Budget\finance.db` |
+
+---
+
+## Dev setup
+
+Requisiti: [Node.js](https://nodejs.org) (LTS), Git.
+
+```bash
+git clone https://github.com/tizianocappai/finance-journal.git
+cd finance-journal/electron
+npm install
+npm run dev
+```
+
+### Test
+
+```bash
+# Unit test (Vitest)
+npm test
+
+# E2E test (Playwright)
+npm run test:e2e
+```
+
+### Build locale
+
+```bash
+npm run make
+```
+
+Gli artefatti vengono generati in `electron/out/make/`.
 
 ---
 
 ## Stato del progetto
 
-In sviluppo attivo. Funzionalità core stabili (movimenti, dashboard, import CSV). Roadmap: sezione Casa, distribuzione binaria macOS (`.dmg`), supporto Windows/Linux.
+In sviluppo attivo. Funzionalità core stabili (movimenti, dashboard, import CSV). Roadmap: sezione Casa.

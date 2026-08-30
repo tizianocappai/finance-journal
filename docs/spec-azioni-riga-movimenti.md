@@ -10,26 +10,26 @@ Sostituire il doppio-click sulla riga della tabella Movimenti con pulsanti "Modi
 
 ## Tech Stack
 
-- Python 3.12+, PyQt6
-- SQLite (via `sqlite3` stdlib)
-- pytest per i test
+- Electron 44 + React + TypeScript
+- SQLite (via `better-sqlite3`)
+- Vitest per i test unitari, Playwright per i test e2e
 
 ## Commands
 
-```
-Test:  source .venv/bin/activate && python3 -m pytest tests/ -x -q
-Run:   source .venv/bin/activate && python3 -m finance_journal
+```bash
+Test:  cd electron && npm test
+E2E:   cd electron && npm run test:e2e
+Run:   cd electron && npm run dev
 ```
 
 ## Project Structure
 
 ```
-src/finance_journal/
-├── ui/
-│   ├── movimenti.py          ← tabella movimenti — file principale da modificare
-│   └── movimento_dialog.py   ← dialog modifica — rimuovere bottone "Elimina"
-tests/
-└── (nessun nuovo test UI — la logica repository è già coperta)
+electron/src/
+├── renderer/
+│   └── components/
+│       ├── MovimentiTable.tsx    ← tabella movimenti — file principale da modificare
+│       └── MovimentoDialog.tsx   ← dialog modifica — rimuovere pulsante "Elimina"
 ```
 
 ## Decisioni di design (da grilling)
@@ -45,27 +45,19 @@ tests/
 
 ## Code Style
 
-Il pulsante azione va inserito via `setCellWidget`. Ogni riga usa un `QWidget` container con `QHBoxLayout` contenente i due `QPushButton`. La connessione al segnale usa `lambda row=row: self._on_modifica(row)` per catturare l'indice correttamente nel loop.
+I pulsanti azione vanno resi inline nella riga della tabella come componente React. Ogni riga include una cella con due `<button>` ("Modifica" ed "Elimina") che ricevono l'id del Movimento via props e chiamano le callback appropriate.
 
-```python
-# pattern per ogni riga in _load_table
-cell = QWidget()
-lay = QHBoxLayout(cell)
-lay.setContentsMargins(2, 2, 2, 2)
-lay.setSpacing(4)
-btn_mod = QPushButton("Modifica")
-btn_mod.clicked.connect(lambda checked=False, r=row: self._on_modifica(r))
-btn_del = QPushButton("Elimina")
-btn_del.setStyleSheet("color: #c62828;")
-btn_del.clicked.connect(lambda checked=False, r=row: self._on_elimina(r))
-lay.addWidget(btn_mod)
-lay.addWidget(btn_del)
-self._table.setCellWidget(row, len(_COLS), cell)
+```tsx
+// pattern per la cella azioni in MovimentiTable.tsx
+<td>
+  <button onClick={() => onModifica(movimento.id)}>Modifica</button>
+  <button style={{ color: '#c62828' }} onClick={() => onElimina(movimento.id)}>Elimina</button>
+</td>
 ```
 
 ## Testing Strategy
 
-Le funzioni repository (`create`, `update`, `delete`) sono già testate. Non servono nuovi test di unità per il layer UI (PyQt6 non è testabile headless in questo setup). La verifica avviene manualmente eseguendo l'app.
+Le funzioni repository (`create`, `update`, `delete`) sono già testate con Vitest. Non servono nuovi test unitari per il layer UI. La verifica avviene manualmente eseguendo l'app con `npm run dev`, oppure tramite test Playwright se il flusso è incluso in `e2e/`.
 
 ## Boundaries
 

@@ -8,7 +8,7 @@ Gestire le proprie finanze personali richiede oggi di affidarsi a fogli di calco
 
 ## Solution
 
-Finance Journal è un'applicazione desktop Python (PyQt6) che salva tutti i dati in locale su un file SQLite. La sezione **Personale** offre:
+Finance Journal è un'applicazione desktop Electron che salva tutti i dati in locale su un file SQLite. La sezione **Personale** offre:
 
 - Una **Dashboard** con KPI annuali, andamento mensile, breakdown per categoria e confronto con l'anno precedente
 - Una **Lista Movimenti** con filtri avanzati e inserimento/modifica/eliminazione tramite dialog modale
@@ -75,10 +75,10 @@ L'app funziona completamente offline e non espone alcun dato a servizi esterni.
 
 ### Architettura generale
 
-- **Framework GUI**: PyQt6
-- **Grafici**: matplotlib embedded via `FigureCanvasQtAgg`
-- **Database**: SQLite, un singolo file per tutta l'app (Personale + Casa futura su tabelle separate)
-- **Path cross-platform**: libreria `platformdirs` — Linux: `~/.local/share/finance-journal/`, macOS: `~/Library/Application Support/finance-journal/`, Windows: `%APPDATA%/finance-journal/`
+- **Framework GUI**: Electron 44 + React + TypeScript
+- **Grafici**: Recharts (o libreria React compatibile)
+- **Database**: SQLite via `better-sqlite3`, un singolo file per tutta l'app (Personale + Casa futura su tabelle separate)
+- **Path cross-platform**: `app.getPath('userData')` di Electron — Linux: `~/.config/`, macOS: `~/Library/Application Support/`, Windows: `%APPDATA%/`
 - **Tema**: segue il sistema operativo di default, override manuale nelle Impostazioni
 
 ### Navigazione
@@ -121,7 +121,7 @@ Testare il **comportamento osservabile** (dati persistiti, query restituite, agg
 
 ### Seam 1 — Repository layer
 
-Testare ogni operazione del Repository contro un DB SQLite in-memory:
+Testare ogni operazione del Repository contro un DB SQLite in-memory con Vitest:
 
 - `MovimentoRepository`: creazione, lettura, aggiornamento, eliminazione, filtro per periodo/tipo/categoria/metodo, ricerca per testo
 - `CategoriaRepository`: CRUD, eliminazione con riassegnazione a "Altro", distinzione predefinite/custom
@@ -130,7 +130,7 @@ Testare ogni operazione del Repository contro un DB SQLite in-memory:
 
 ### Seam 2 — Aggregation functions
 
-Testare le funzioni di aggregazione dashboard come pure functions:
+Testare le funzioni di aggregazione dashboard come pure functions (Vitest):
 
 - Calcolo KPI annuali (totale entrate, totale uscite, saldo, mesi in rosso) su fixture di Movimenti
 - Breakdown mensile corretto anche con mesi senza Movimenti
@@ -139,7 +139,7 @@ Testare le funzioni di aggregazione dashboard come pure functions:
 
 ### Fuori scope dai test automatici
 
-La UI PyQt6, i grafici matplotlib e la navigazione visiva non vengono testati automaticamente.
+La UI React, i grafici e la navigazione visiva non vengono testati con Vitest. I flussi principali possono essere coperti da test Playwright (`npm run test:e2e`).
 
 ## Out of Scope
 
