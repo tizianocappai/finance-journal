@@ -3,7 +3,7 @@ import { Pencil, Trash2, X } from 'lucide-react';
 import { useThemeStore, type Theme } from '@/stores/theme';
 import { useLookupStore } from '@/stores/lookup';
 import { cn } from '@/lib/utils';
-import type { Categoria } from '../../../ipc/types';
+import type { Categoria, Dettaglio } from '../../../ipc/types';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -344,7 +344,7 @@ function DeleteCategoriaModal({
           <button
             onClick={() => { void handleConfirm(); }}
             disabled={!canConfirm}
-            className={`${BTN_BASE} border-destructive bg-destructive text-destructive-foreground hover:opacity-90`}
+            className={cn(BTN_BASE, 'border-destructive bg-destructive text-destructive-foreground hover:opacity-90')}
           >
             {busy ? 'Conferma…' : 'Conferma'}
           </button>
@@ -488,11 +488,362 @@ function CategorieSection() {
   );
 }
 
+// ─── EditDettaglioDialog ─────────────────────────────────────────────────────
+
+interface EditDettaglioDialogProps {
+  det: Dettaglio;
+  categorie: Categoria[];
+  onSave: (id: number, nome: string, categoria_id?: number) => Promise<void>;
+  onClose: () => void;
+}
+
+function EditDettaglioDialog({ det, categorie, onSave, onClose }: EditDettaglioDialogProps) {
+  const [nome, setNome] = useState(det.nome);
+  const [categoriaId, setCategoriaId] = useState<string>(
+    det.categoria_id != null ? String(det.categoria_id) : '',
+  );
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const nomeRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    nomeRef.current?.focus();
+  }, []);
+
+  async function handleSave() {
+    const n = nome.trim();
+    if (!n) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave(det.id, n, categoriaId ? Number(categoriaId) : undefined);
+      onClose();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-det-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative w-full max-w-sm rounded-lg border border-border bg-background shadow-lg">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h2 id="edit-det-title" className="text-sm font-semibold text-foreground">Modifica dettaglio</h2>
+          <button onClick={onClose} aria-label="Chiudi" className={BTN_GHOST}>
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+        <form
+          className="px-5 py-4 space-y-3"
+          onSubmit={(e) => { e.preventDefault(); void handleSave(); }}
+        >
+          <div>
+            <label className="mb-1 block text-xs font-medium text-foreground" htmlFor="det-nome">
+              Nome <span aria-hidden>*</span>
+            </label>
+            <input
+              id="det-nome"
+              ref={nomeRef}
+              type="text"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Es. Supermercato"
+              required
+              className={cn(INPUT_CLS, 'w-full flex-none')}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-foreground" htmlFor="det-categoria">
+              Categoria associata
+            </label>
+            <select
+              id="det-categoria"
+              value={categoriaId}
+              onChange={(e) => setCategoriaId(e.target.value)}
+              className={cn(
+                'block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm',
+                'text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              )}
+            >
+              <option value="">— Nessuna —</option>
+              {categorie.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+          {err && <p role="alert" className="text-xs text-destructive">{err}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className={BTN_MUTED}>Annulla</button>
+            <button type="submit" disabled={saving || !nome.trim()} className={BTN_PRIMARY}>
+              {saving ? 'Salvataggio…' : 'Salva'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── DeleteDettaglioModal ─────────────────────────────────────────────────────
+
+interface DeleteDettaglioModalProps {
+  det: Dettaglio;
+  altriDettagli: Dettaglio[];
+  onClose: () => void;
+  onDeleted: () => Promise<void>;
+}
+
+function DeleteDettaglioModal({ det, altriDettagli, onClose, onDeleted }: DeleteDettaglioModalProps) {
+  const hasOthers = altriDettagli.length > 0;
+  const [mode, setMode] = useState<'existing' | 'new' | null>(null);
+  const [existingId, setExistingId] = useState<string>('');
+  const [newNome, setNewNome] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const canConfirm =
+    !busy &&
+    ((mode === 'existing' && Boolean(existingId)) ||
+      (mode === 'new' && Boolean(newNome.trim())));
+
+  async function handleConfirm() {
+    if (!canConfirm) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      let targetId: number;
+      if (mode === 'existing') {
+        targetId = Number(existingId);
+      } else {
+        const created = (await window.electronAPI.dettagli.create({ nome: newNome.trim() })) as Dettaglio;
+        targetId = created.id;
+      }
+      await window.electronAPI.dettagli.delete(det.id, targetId);
+      await onDeleted();
+      onClose();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="del-det-title"
+      aria-describedby="del-det-desc"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative w-full max-w-sm rounded-lg border border-border bg-background shadow-lg">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h2 id="del-det-title" className="text-sm font-semibold text-foreground">
+            Elimina «{det.nome}»
+          </h2>
+          <button onClick={onClose} aria-label="Chiudi" className={BTN_GHOST} disabled={busy}>
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <p id="del-det-desc" className="text-xs text-muted-foreground">
+            Questo dettaglio ha movimenti associati. Scegli a quale dettaglio riassegnarli prima di eliminarlo.
+          </p>
+
+          <fieldset className="space-y-3">
+            <legend className="sr-only">Opzione di riassegnazione</legend>
+
+            {hasOthers && (
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="del-det-mode"
+                  value="existing"
+                  checked={mode === 'existing'}
+                  onChange={() => {
+                    setMode('existing');
+                    if (!existingId) setExistingId(String(altriDettagli[0].id));
+                  }}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <span className="text-sm text-foreground">Scegli esistente</span>
+                  {mode === 'existing' && (
+                    <select
+                      value={existingId}
+                      onChange={(e) => setExistingId(e.target.value)}
+                      aria-label="Dettaglio destinazione"
+                      className={cn(
+                        'mt-2 block w-full rounded-md border border-border bg-background px-2 py-1 text-sm',
+                        'text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      )}
+                    >
+                      {altriDettagli.map((d) => (
+                        <option key={d.id} value={d.id}>{d.nome}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </label>
+            )}
+
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="del-det-mode"
+                value="new"
+                checked={mode === 'new'}
+                onChange={() => setMode('new')}
+                className="mt-0.5"
+              />
+              <div className="flex-1">
+                <span className="text-sm text-foreground">Crea nuovo</span>
+                {mode === 'new' && (
+                  <input
+                    type="text"
+                    value={newNome}
+                    onChange={(e) => setNewNome(e.target.value)}
+                    placeholder="Nome dettaglio"
+                    autoFocus
+                    className={cn(INPUT_CLS, 'mt-2 w-full flex-none')}
+                  />
+                )}
+              </div>
+            </label>
+          </fieldset>
+
+          {err && <p role="alert" className="text-xs text-destructive">{err}</p>}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+          <button onClick={onClose} disabled={busy} className={BTN_MUTED}>Annulla</button>
+          <button
+            onClick={() => { void handleConfirm(); }}
+            disabled={!canConfirm}
+            className={cn(BTN_BASE, 'border-destructive bg-destructive text-destructive-foreground hover:opacity-90')}
+          >
+            {busy ? 'Conferma…' : 'Conferma'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DettagliSection ──────────────────────────────────────────────────────────
+
+interface PendingDeleteDettaglio {
+  det: Dettaglio;
+}
+
+function DettagliSection() {
+  const { dettagli, categorie, syncDettagli, updateDettaglio } = useLookupStore();
+  const [editTarget, setEditTarget] = useState<Dettaglio | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDeleteDettaglio | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleDeleteClick(det: Dettaglio) {
+    setErr(null);
+    try {
+      const count = await window.electronAPI.dettagli.countMovimenti(det.id);
+      if (count === 0) {
+        setDeleting(det.id);
+        try {
+          // count=0: UPDATE è no-op, self-ref è valido per soddisfare il contratto API
+          await window.electronAPI.dettagli.delete(det.id, det.id);
+          await syncDettagli();
+        } finally {
+          setDeleting(null);
+        }
+      } else {
+        setPendingDelete({ det });
+      }
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
+  return (
+    <>
+      {editTarget && (
+        <EditDettaglioDialog
+          det={editTarget}
+          categorie={categorie}
+          onSave={updateDettaglio}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
+
+      {pendingDelete && (
+        <DeleteDettaglioModal
+          det={pendingDelete.det}
+          altriDettagli={dettagli.filter((d) => d.id !== pendingDelete.det.id)}
+          onClose={() => setPendingDelete(null)}
+          onDeleted={syncDettagli}
+        />
+      )}
+
+      <section aria-labelledby="dettagli-heading">
+        <SectionHeading id="dettagli-heading">Dettagli</SectionHeading>
+        <SectionDesc>Modifica o elimina i dettagli. Se un dettaglio ha movimenti associati, la riassegnazione è obbligatoria prima dell&apos;eliminazione.</SectionDesc>
+
+        <ul role="list" className="divide-y divide-border rounded-md border border-border">
+          {dettagli.map((det) => {
+            const catNome = categorie.find((c) => c.id === det.categoria_id)?.nome;
+            return (
+              <li key={det.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <span className="truncate text-foreground">{det.nome}</span>
+                  {catNome && (
+                    <span className="ml-2 text-xs text-muted-foreground">{catNome}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setEditTarget(det)}
+                  aria-label={`Modifica ${det.nome}`}
+                  className={BTN_GHOST}
+                >
+                  <Pencil size={14} aria-hidden />
+                </button>
+                <button
+                  onClick={() => { void handleDeleteClick(det); }}
+                  disabled={deleting === det.id}
+                  aria-label={`Elimina ${det.nome}`}
+                  className={BTN_GHOST_DANGER}
+                >
+                  <Trash2 size={14} aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+          {dettagli.length === 0 && (
+            <li className="px-3 py-2 text-xs text-muted-foreground">Nessun dettaglio.</li>
+          )}
+        </ul>
+
+        {err && <p role="alert" className="mt-2 text-xs text-destructive">{err}</p>}
+      </section>
+    </>
+  );
+}
+
 // ─── main screen ──────────────────────────────────────────────────────────────
 
 export default function ImpostazioniScreen() {
   const { theme, setTheme } = useThemeStore();
-  const { syncCategorie } = useLookupStore();
+  const { syncCategorie, syncDettagli } = useLookupStore();
 
   const [dbPath, setDbPath] = useState<string>('');
   const [dataStatus, setDataStatus] = useState<StatusMsg | null>(null);
@@ -508,6 +859,7 @@ export default function ImpostazioniScreen() {
       }
     })();
     void syncCategorie();
+    void syncDettagli();
   }, []);
 
   async function handleExportJson() {
@@ -559,6 +911,9 @@ export default function ImpostazioniScreen() {
 
           {/* Categorie */}
           <CategorieSection />
+
+          {/* Dettagli */}
+          <DettagliSection />
 
           {/* Aspetto */}
           <section aria-labelledby="appearance-heading">
