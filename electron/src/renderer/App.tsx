@@ -7,6 +7,7 @@ import ResocontoLayout from '@/components/ResocontoLayout';
 import DashboardScreen from '@/components/screens/DashboardScreen';
 import MovimentiScreen from '@/components/screens/MovimentiScreen';
 import ImpostazioniScreen from '@/components/screens/ImpostazioniScreen';
+import ResocontoImpostazioniScreen from '@/components/screens/ResocontoImpostazioniScreen';
 import Toast from '@/components/Toast';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -45,6 +46,7 @@ export default function App() {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<DashboardScreen />} />
               <Route path="movimenti" element={<MovimentiScreen />} />
+              <Route path="impostazioni" element={<ResocontoImpostazioniScreen />} />
             </Route>
             <Route path="/impostazioni" element={<ImpostazioniScreen />} />
             <Route path="*" element={<Navigate to="/resoconto/dashboard" replace />} />

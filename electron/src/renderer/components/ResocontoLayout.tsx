@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { label: 'Dashboard', to: '/resoconto/dashboard' },
   { label: 'Movimenti', to: '/resoconto/movimenti' },
+  { label: 'Impostazioni', to: '/resoconto/impostazioni' },
 ] as const;
 
 function TabChip({ label, to }: { label: string; to: string }) {
