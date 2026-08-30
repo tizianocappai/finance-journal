@@ -7,6 +7,7 @@ import {
   listDettagli,
   createDettaglio,
   deleteDettaglio,
+  updateDettaglio,
   updateDettaglioCategoria,
   countMovimentiByDettaglio,
 } from './dettagli';
@@ -142,8 +143,11 @@ export function registerLookupHandlers(
   ipcMain.handle('dettagli:create', (_e, { nome, categoria_id }: { nome: string; categoria_id?: number }) =>
     createDettaglio(db, nome, categoria_id),
   );
-  ipcMain.handle('dettagli:delete', (_e, { id }: { id: number }) =>
-    deleteDettaglio(db, id),
+  ipcMain.handle('dettagli:update', (_e, { id, nome, categoria_id }: { id: number; nome: string; categoria_id?: number }) =>
+    updateDettaglio(db, id, nome, categoria_id),
+  );
+  ipcMain.handle('dettagli:delete', (_e, { id, targetDettaglioId }: { id: number; targetDettaglioId: number }) =>
+    deleteDettaglio(db, id, targetDettaglioId),
   );
   ipcMain.handle('dettagli:update-categoria', (_e, { id, categoria_id }: { id: number; categoria_id: number | null }) =>
     updateDettaglioCategoria(db, id, categoria_id),

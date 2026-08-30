@@ -30,17 +30,52 @@ export function createDettaglio(
   }
 }
 
-export function deleteDettaglio(db: Database.Database, id: number): void {
+export function updateDettaglio(
+  db: Database.Database,
+  id: number,
+  nome: string,
+  categoria_id?: number,
+): Dettaglio {
+  try {
+    const existing = db
+      .prepare('SELECT * FROM dettagli WHERE id = ?')
+      .get(id) as Dettaglio | undefined;
+    if (!existing) throw new Error(`Dettaglio con id=${id} non trovato`);
+
+    const row = db
+      .prepare(
+        `UPDATE dettagli SET nome = ?, categoria_id = ? WHERE id = ? RETURNING *`,
+      )
+      .get(nome, categoria_id ?? existing.categoria_id, id) as Dettaglio | undefined;
+
+    if (!row) throw new Error(`Dettaglio con id=${id} non trovato`);
+    return row;
+  } catch (err) {
+    if (err instanceof Error) throw err;
+    throw new Error(`Failed to update dettaglio id=${id}: ${String(err)}`);
+  }
+}
+
+export function deleteDettaglio(
+  db: Database.Database,
+  id: number,
+  targetDettaglioId: number,
+): void {
   try {
     const det = db
       .prepare('SELECT * FROM dettagli WHERE id = ?')
       .get(id) as Dettaglio | undefined;
 
     if (!det) throw new Error(`Dettaglio con id=${id} non trovato`);
-    if (det.predefinito) throw new Error(`Dettaglio predefinito non eliminabile`);
+
+    const target = db
+      .prepare('SELECT id FROM dettagli WHERE id = ?')
+      .get(targetDettaglioId) as { id: number } | undefined;
+
+    if (!target) throw new Error(`Dettaglio target con id=${targetDettaglioId} non trovato`);
 
     db.transaction(() => {
-      db.prepare('UPDATE movimenti SET dettaglio_id = NULL WHERE dettaglio_id = ?').run(id);
+      db.prepare('UPDATE movimenti SET dettaglio_id = ? WHERE dettaglio_id = ?').run(targetDettaglioId, id);
       db.prepare('DELETE FROM dettagli WHERE id = ?').run(id);
     })();
   } catch (err) {

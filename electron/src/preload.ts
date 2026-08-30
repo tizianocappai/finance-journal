@@ -25,7 +25,10 @@ try {
       list: () => ipcRenderer.invoke('dettagli:list'),
       create: (data: { nome: string; categoria_id?: number }) =>
         ipcRenderer.invoke('dettagli:create', data),
-      delete: (id: number) => ipcRenderer.invoke('dettagli:delete', { id }),
+      update: (id: number, nome: string, categoria_id?: number) =>
+        ipcRenderer.invoke('dettagli:update', { id, nome, categoria_id }),
+      delete: (id: number, targetDettaglioId: number) =>
+        ipcRenderer.invoke('dettagli:delete', { id, targetDettaglioId }),
       updateCategoria: (id: number, categoria_id: number | null) =>
         ipcRenderer.invoke('dettagli:update-categoria', { id, categoria_id }),
       countMovimenti: (id: number) =>

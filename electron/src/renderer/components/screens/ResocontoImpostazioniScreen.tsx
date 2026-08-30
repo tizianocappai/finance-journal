@@ -169,7 +169,7 @@ interface DettagliListProps {
   items: Dettaglio[];
   categorie: Categoria[];
   onAdd: (nome: string, categoria_id?: number) => Promise<void>;
-  onDelete: (id: number) => Promise<void>;
+  onDelete: (id: number, targetDettaglioId: number) => Promise<void>;
   onUpdateCategoria: (id: number, categoria_id: number | null) => Promise<void>;
 }
 
@@ -179,6 +179,7 @@ function DettagliList({ items, categorie, onAdd, onDelete, onUpdateCategoria }: 
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: number; nome: string; count: number } | null>(null);
+  const [pendingTargetId, setPendingTargetId] = useState<string>('');
   const [updatingCat, setUpdatingCat] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -203,23 +204,29 @@ function DettagliList({ items, categorie, onAdd, onDelete, onUpdateCategoria }: 
 
   async function handleDeleteRequest(id: number, nome: string) {
     setErr(null);
+    const others = items.filter((d) => d.id !== id);
+    if (others.length === 0) {
+      setErr('Impossibile eliminare: nessun altro dettaglio disponibile come destinazione.');
+      return;
+    }
     try {
       const count = await window.electronAPI.dettagli.countMovimenti(id);
       if (count > 0) {
+        setPendingTargetId(String(others[0].id));
         setPendingDelete({ id, nome, count });
       } else {
-        await doDelete(id);
+        await doDelete(id, others[0].id);
       }
     } catch (e) {
       setErr(String(e));
     }
   }
 
-  async function doDelete(id: number) {
+  async function doDelete(id: number, targetDettaglioId: number) {
     setDeleting(id);
     setPendingDelete(null);
     try {
-      await onDelete(id);
+      await onDelete(id, targetDettaglioId);
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -249,7 +256,7 @@ function DettagliList({ items, categorie, onAdd, onDelete, onUpdateCategoria }: 
     <section aria-labelledby="dettagli-heading">
       <SectionHeading id="dettagli-heading">Dettagli</SectionHeading>
       <SectionDesc>
-        Aggiungi dettagli personalizzati e associali a una categoria. I dettagli predefiniti non sono eliminabili.
+        Aggiungi dettagli personalizzati e associali a una categoria.
       </SectionDesc>
 
       {pendingDelete && (
@@ -263,15 +270,27 @@ function DettagliList({ items, categorie, onAdd, onDelete, onUpdateCategoria }: 
             Elimina «{pendingDelete.nome}»?
           </p>
           <p id="del-warn-desc" className="mt-0.5 text-xs text-muted-foreground">
-            {pendingDelete.count} moviment{pendingDelete.count === 1 ? 'o' : 'i'} usa{pendingDelete.count === 1 ? '' : 'no'} questo dettaglio. Il campo dettaglio verrà impostato a vuoto, la categoria rimarrà invariata.
+            {pendingDelete.count} moviment{pendingDelete.count === 1 ? 'o' : 'i'} usa{pendingDelete.count === 1 ? '' : 'no'} questo dettaglio. Scegli il dettaglio a cui riassegnarli.
           </p>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex items-center gap-2">
+            <select
+              value={pendingTargetId}
+              onChange={(e) => setPendingTargetId(e.target.value)}
+              aria-label="Dettaglio destinazione"
+              className={SELECT_CLS}
+            >
+              {items
+                .filter((d) => d.id !== pendingDelete.id)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>{d.nome}</option>
+                ))}
+            </select>
             <button
-              onClick={() => { void doDelete(pendingDelete.id); }}
-              disabled={deleting !== null}
+              onClick={() => { void doDelete(pendingDelete.id, Number(pendingTargetId)); }}
+              disabled={deleting !== null || !pendingTargetId}
               className={`${BTN_BASE} border-destructive bg-destructive text-destructive-foreground hover:opacity-90 text-xs`}
             >
-              Elimina comunque
+              Elimina
             </button>
             <button
               onClick={() => setPendingDelete(null)}
@@ -304,16 +323,14 @@ function DettagliList({ items, categorie, onAdd, onDelete, onUpdateCategoria }: 
                 <option key={c.id} value={c.id}>{c.nome}</option>
               ))}
             </select>
-            {!item.predefinito && (
-              <button
-                onClick={() => { void handleDeleteRequest(item.id, item.nome); }}
-                disabled={deleting === item.id || pendingDelete !== null}
-                aria-label={`Elimina ${item.nome}`}
-                className={BTN_GHOST}
-              >
-                <Trash2 size={14} aria-hidden />
-              </button>
-            )}
+            <button
+              onClick={() => { void handleDeleteRequest(item.id, item.nome); }}
+              disabled={deleting === item.id || pendingDelete !== null}
+              aria-label={`Elimina ${item.nome}`}
+              className={BTN_GHOST}
+            >
+              <Trash2 size={14} aria-hidden />
+            </button>
           </li>
         ))}
         {items.length === 0 && (

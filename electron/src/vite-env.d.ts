@@ -35,7 +35,8 @@ declare global {
       dettagli: {
         list: () => Promise<Dettaglio[]>;
         create: (data: { nome: string; categoria_id?: number }) => Promise<Dettaglio>;
-        delete: (id: number) => Promise<void>;
+        update: (id: number, nome: string, categoria_id?: number) => Promise<Dettaglio>;
+        delete: (id: number, targetDettaglioId: number) => Promise<void>;
         updateCategoria: (id: number, categoria_id: number | null) => Promise<Dettaglio>;
         countMovimenti: (id: number) => Promise<number>;
       };

@@ -16,7 +16,8 @@ interface LookupState {
 
   syncDettagli: () => Promise<void>;
   createDettaglio: (nome: string, categoria_id?: number) => Promise<void>;
-  deleteDettaglio: (id: number) => Promise<void>;
+  updateDettaglio: (id: number, nome: string, categoria_id?: number) => Promise<void>;
+  deleteDettaglio: (id: number, targetDettaglioId: number) => Promise<void>;
   updateDettaglioCategoria: (id: number, categoria_id: number | null) => Promise<void>;
 }
 
@@ -107,9 +108,21 @@ export const useLookupStore = create<LookupState>()((set) => ({
     }
   },
 
-  deleteDettaglio: async (id) => {
+  updateDettaglio: async (id, nome, categoria_id) => {
     try {
-      await window.electronAPI.dettagli.delete(id);
+      const updated = await window.electronAPI.dettagli.update(id, nome, categoria_id);
+      set((state) => ({
+        dettagli: state.dettagli.map((d) => (d.id === id ? updated : d)),
+      }));
+    } catch (err) {
+      console.error('updateDettaglio failed:', err);
+      throw err;
+    }
+  },
+
+  deleteDettaglio: async (id, targetDettaglioId) => {
+    try {
+      await window.electronAPI.dettagli.delete(id, targetDettaglioId);
       const data = await window.electronAPI.dettagli.list();
       set({ dettagli: data });
     } catch (err) {

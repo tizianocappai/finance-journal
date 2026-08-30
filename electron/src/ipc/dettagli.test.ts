@@ -5,6 +5,7 @@ import {
   listDettagli,
   createDettaglio,
   deleteDettaglio,
+  updateDettaglio,
   updateDettaglioCategoria,
   countMovimentiByDettaglio,
 } from './dettagli';
@@ -60,35 +61,72 @@ describe('createDettaglio', () => {
 describe('deleteDettaglio', () => {
   it('elimina un dettaglio custom', () => {
     const det = createDettaglio(db, 'Supermercato');
-    deleteDettaglio(db, det.id);
+    const target = createDettaglio(db, 'Altro');
+    deleteDettaglio(db, det.id, target.id);
     expect(listDettagli(db).map((d) => d.nome)).not.toContain('Supermercato');
   });
 
-  it('imposta dettaglio_id = NULL sui movimenti che lo referenziano', () => {
+  it('riassegna dettaglio_id al targetDettaglioId sui movimenti che lo referenziano', () => {
     const det = createDettaglio(db, 'Supermercato');
+    const target = createDettaglio(db, 'Altro');
     db.prepare(
       `INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-01', 30, 'uscita', ?)`,
     ).run(det.id);
 
-    deleteDettaglio(db, det.id);
+    deleteDettaglio(db, det.id, target.id);
 
     const mov = db
       .prepare('SELECT dettaglio_id FROM movimenti WHERE 1=1')
       .get() as { dettaglio_id: number | null };
-    expect(mov.dettaglio_id).toBeNull();
+    expect(mov.dettaglio_id).toBe(target.id);
   });
 
-  it('blocca l\'eliminazione di un dettaglio predefinito', () => {
+  it('elimina un dettaglio predefinito senza blocchi', () => {
     const det = db
       .prepare(
         `INSERT INTO dettagli (nome, predefinito) VALUES ('DetPredefinito', 1) RETURNING *`,
       )
       .get() as { id: number };
-    expect(() => deleteDettaglio(db, det.id)).toThrow(/predefinito/i);
+    const target = createDettaglio(db, 'Altro');
+    expect(() => deleteDettaglio(db, det.id, target.id)).not.toThrow();
   });
 
   it('lancia errore se il dettaglio non esiste', () => {
-    expect(() => deleteDettaglio(db, 9999)).toThrow();
+    const target = createDettaglio(db, 'Altro');
+    expect(() => deleteDettaglio(db, 9999, target.id)).toThrow();
+  });
+
+  it('lancia errore se il targetDettaglioId non esiste', () => {
+    const det = createDettaglio(db, 'Supermercato');
+    expect(() => deleteDettaglio(db, det.id, 9999)).toThrow();
+  });
+});
+
+describe('updateDettaglio', () => {
+  it('aggiorna nome e categoria_id', () => {
+    const cat = listCategorie(db).find((c) => c.nome === 'Alimentari')!;
+    const det = createDettaglio(db, 'Supermercato');
+    const updated = updateDettaglio(db, det.id, 'Ipermercato', cat.id);
+    expect(updated.nome).toBe('Ipermercato');
+    expect(updated.categoria_id).toBe(cat.id);
+  });
+
+  it('aggiorna solo il nome preservando la categoria_id esistente', () => {
+    const cat = listCategorie(db).find((c) => c.nome === 'Alimentari')!;
+    const det = createDettaglio(db, 'Supermercato', cat.id);
+    const updated = updateDettaglio(db, det.id, 'Ipermercato');
+    expect(updated.nome).toBe('Ipermercato');
+    expect(updated.categoria_id).toBe(cat.id);
+  });
+
+  it('lancia errore se l\'id non esiste', () => {
+    expect(() => updateDettaglio(db, 9999, 'Nome')).toThrow();
+  });
+
+  it('lancia errore se il nome è già usato da un altro dettaglio', () => {
+    createDettaglio(db, 'Supermercato');
+    const det2 = createDettaglio(db, 'Bar');
+    expect(() => updateDettaglio(db, det2.id, 'Supermercato')).toThrow();
   });
 });
 
