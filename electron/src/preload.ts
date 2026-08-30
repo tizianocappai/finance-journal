@@ -48,6 +48,8 @@ try {
         ipcRenderer.invoke('dashboard:riepilogo-mensile', { anno }),
       pivotCategorie: (anno: number, tipo: 'uscita' | 'entrata') =>
         ipcRenderer.invoke('dashboard:pivot-categorie', { anno, tipo }),
+      trendMensile: (anno: number) =>
+        ipcRenderer.invoke('dashboard:trend-mensile', { anno }),
     },
     fileOps: {
       exportCsv: () => ipcRenderer.invoke('export:csv') as Promise<{ path: string } | null>,

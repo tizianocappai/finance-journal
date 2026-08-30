@@ -8,6 +8,7 @@ import {
   getTrendYoY,
   getRiepilogoMensile,
   getPivotCategorie,
+  getTrendMensile,
 } from './dashboard';
 import { createMovimento } from './movimenti';
 import { listCategorie } from './categorie';
@@ -414,5 +415,66 @@ describe('getPivotCategorie', () => {
     createMovimento(db, { data: '2023-05-10', importo: 999, tipo: 'uscita', categoria_id: ali.id });
 
     expect(getPivotCategorie(db, 2024, 'uscita')).toHaveLength(0);
+  });
+});
+
+describe('getTrendMensile', () => {
+  it('entrambe serie a zero per anno senza movimenti', () => {
+    const result = getTrendMensile(db, 2024);
+    expect(result.corrente).toHaveLength(12);
+    expect(result.precedente).toHaveLength(12);
+    expect(result.corrente.every((v) => v === 0)).toBe(true);
+    expect(result.precedente.every((v) => v === 0)).toBe(true);
+  });
+
+  it('calcola saldo mensile netto per anno corrente', () => {
+    seed();
+    // 2024: gen: 2000-500=1500, feb: 0-300=-300, mar: 1500-800=700
+    const result = getTrendMensile(db, 2024);
+    expect(result.corrente[0]).toBeCloseTo(1500);
+    expect(result.corrente[1]).toBeCloseTo(-300);
+    expect(result.corrente[2]).toBeCloseTo(700);
+    expect(result.corrente[3]).toBe(0);
+  });
+
+  it('calcola saldo mensile netto per anno precedente', () => {
+    seed();
+    // 2023: giu (index 5): 1800-600=1200
+    const result = getTrendMensile(db, 2024);
+    expect(result.precedente[5]).toBeCloseTo(1200);
+    expect(result.precedente[0]).toBe(0);
+  });
+
+  it('anno precedente senza dati → serie precedente tutta a zero', () => {
+    // Solo dati per 2024, nessuno per 2023
+    createMovimento(db, { data: '2024-03-10', importo: 500, tipo: 'entrata' });
+    const result = getTrendMensile(db, 2024);
+    expect(result.precedente.every((v) => v === 0)).toBe(true);
+    expect(result.corrente[2]).toBeCloseTo(500);
+  });
+
+  it('saldo non cumulativo: ogni mese indipendente', () => {
+    createMovimento(db, { data: '2024-01-01', importo: 100, tipo: 'entrata' });
+    createMovimento(db, { data: '2024-02-01', importo: 200, tipo: 'entrata' });
+    const result = getTrendMensile(db, 2024);
+    expect(result.corrente[0]).toBeCloseTo(100);
+    expect(result.corrente[1]).toBeCloseTo(200);
+  });
+});
+
+describe('getTrendMensile — scenario combinato', () => {
+  it('entrambe le serie corrette quando entrambi gli anni hanno dati', () => {
+    seed();
+    // seed: 2024 gen=1500, feb=-300, mar=700; 2023 giu=1200
+    const result = getTrendMensile(db, 2024);
+    // Anno corrente
+    expect(result.corrente[0]).toBeCloseTo(1500);
+    expect(result.corrente[1]).toBeCloseTo(-300);
+    expect(result.corrente[2]).toBeCloseTo(700);
+    // Anno precedente
+    expect(result.precedente[5]).toBeCloseTo(1200);
+    // Mesi senza dati
+    expect(result.corrente[3]).toBe(0);
+    expect(result.precedente[0]).toBe(0);
   });
 });

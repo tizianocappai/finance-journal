@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY, RiepilogoMensile, RiepilogoMensileResult, PivotCategoriaRiga } from './types';
+import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY, RiepilogoMensile, RiepilogoMensileResult, PivotCategoriaRiga, TrendMensile } from './types';
 import { getSaldoIniziale } from './impostazioni';
 
 const NOMI_MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
@@ -204,6 +204,34 @@ export function getPivotCategorie(
     });
   } catch (err) {
     throw new Error(`Failed to get pivot categorie: ${String(err)}`);
+  }
+}
+
+export function getTrendMensile(db: Database.Database, anno: number): TrendMensile {
+  try {
+    const query = db.prepare(
+      `WITH mesi(mese) AS (
+        VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)
+      )
+      SELECT
+        m.mese,
+        COALESCE(SUM(CASE WHEN mv.tipo='entrata' THEN mv.importo ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN mv.tipo='uscita'  THEN mv.importo ELSE 0 END), 0) AS saldo
+      FROM mesi m
+      LEFT JOIN movimenti mv
+        ON CAST(strftime('%m', mv.data) AS INTEGER) = m.mese
+        AND strftime('%Y', mv.data) = ?
+      GROUP BY m.mese
+      ORDER BY m.mese`,
+    );
+
+    type MesiRow = { mese: number; saldo: number };
+    const corrente = (query.all(String(anno)) as MesiRow[]).map((r) => r.saldo);
+    const precedente = (query.all(String(anno - 1)) as MesiRow[]).map((r) => r.saldo);
+
+    return { corrente, precedente };
+  } catch (err) {
+    throw new Error(`Failed to get trend mensile: ${String(err)}`);
   }
 }
 

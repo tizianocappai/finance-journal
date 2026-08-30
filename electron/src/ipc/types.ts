@@ -133,3 +133,8 @@ export interface PivotCategoriaRiga {
   media: number;
   mediana: number;
 }
+
+export interface TrendMensile {
+  corrente: number[];
+  precedente: number[];
+}

@@ -15,6 +15,7 @@ import type {
   TrendYoY,
   RiepilogoMensileResult,
   PivotCategoriaRiga,
+  TrendMensile,
 } from './ipc/types';
 
 declare global {
@@ -51,6 +52,7 @@ declare global {
         trendYoY: (anno: number) => Promise<TrendYoY>;
         riepilogoMensile: (anno: number) => Promise<RiepilogoMensileResult>;
         pivotCategorie: (anno: number, tipo: 'uscita' | 'entrata') => Promise<PivotCategoriaRiga[]>;
+        trendMensile: (anno: number) => Promise<TrendMensile>;
       };
       fileOps: {
         exportCsv: () => Promise<{ path: string } | null>;

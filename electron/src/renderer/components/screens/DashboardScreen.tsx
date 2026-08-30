@@ -4,10 +4,12 @@ import type { AgChartOptions, AgChartTheme } from 'ag-charts-community';
 import { TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, PieChart } from 'lucide-react';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
 import { useDashboardStore } from '@/stores/dashboard';
-import type { RiepilogoMensileResult, PivotCategoriaRiga } from '../../../ipc/types';
+import type { RiepilogoMensileResult, PivotCategoriaRiga, TrendMensile } from '../../../ipc/types';
 
 const COLOR_ENTRATE = '#22c55e';
 const COLOR_USCITE = '#ef4444';
+const COLOR_TREND_CORRENTE = '#3b82f6';
+const COLOR_TREND_PRECEDENTE = '#94a3b8';
 
 const DONUT_COLORS = [
   '#3b82f6',
@@ -33,6 +35,16 @@ function buildBarTheme(isDark: boolean): AgChartTheme {
     palette: {
       fills: [COLOR_ENTRATE, COLOR_USCITE],
       strokes: [COLOR_ENTRATE, COLOR_USCITE],
+    },
+  };
+}
+
+function buildLineTheme(isDark: boolean): AgChartTheme {
+  return {
+    baseTheme: isDark ? 'ag-default-dark' : 'ag-default',
+    palette: {
+      fills: [COLOR_TREND_CORRENTE, COLOR_TREND_PRECEDENTE],
+      strokes: [COLOR_TREND_CORRENTE, COLOR_TREND_PRECEDENTE],
     },
   };
 }
@@ -303,6 +315,14 @@ function RiepilogoMensileTable({ data }: RiepilogoMensileTableProps) {
 
 const NOMI_MESI_SHORT = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 
+function buildTrendMensileData(trendMensile: TrendMensile) {
+  return NOMI_MESI_SHORT.map((nome_mese, i) => ({
+    nome_mese,
+    corrente: trendMensile.corrente[i] ?? 0,
+    precedente: trendMensile.precedente[i] ?? 0,
+  }));
+}
+
 interface PivotCategorieTableProps {
   righe: PivotCategoriaRiga[];
   tipo: 'uscita' | 'entrata';
@@ -399,7 +419,7 @@ export default function DashboardScreen() {
   const isDark = getResolvedTheme(theme) === 'dark';
 
   const {
-    anno, kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile,
+    anno, kpi, serieMensili, breakdownCategorie, trend, trendMensile, riepilogoMensile,
     pivotUscite, pivotEntrate, loading, error, fetch, setAnno,
   } = useDashboardStore();
 
@@ -421,6 +441,22 @@ export default function DashboardScreen() {
         legend: { position: 'bottom' },
       }) as AgChartOptions,
     [isDark, serieMensili],
+  );
+
+  const LINE_MARKER = { enabled: true, size: 5 } as const;
+
+  const lineOptions = useMemo(
+    () =>
+      ({
+        theme: buildLineTheme(isDark),
+        data: trendMensile ? buildTrendMensileData(trendMensile) : [],
+        series: [
+          { type: 'line', xKey: 'nome_mese', yKey: 'corrente', yName: String(anno), marker: LINE_MARKER },
+          { type: 'line', xKey: 'nome_mese', yKey: 'precedente', yName: String(anno - 1), marker: LINE_MARKER },
+        ],
+        legend: { position: 'bottom' },
+      }) as AgChartOptions,
+    [isDark, trendMensile, anno],
   );
 
   const donutOptions = useMemo(
@@ -505,6 +541,18 @@ export default function DashboardScreen() {
 
           <PivotCategorieTable righe={pivotUscite} tipo="uscita" />
           <PivotCategorieTable righe={pivotEntrate} tipo="entrata" />
+
+          {/* Trend mensile: saldo anno corrente vs precedente */}
+          {trendMensile && (
+            <section aria-labelledby="trend-mensile-heading">
+              <h3 id="trend-mensile-heading" className="mb-3 text-sm font-medium text-muted-foreground">
+                Saldo mensile: {anno} vs {anno - 1}
+              </h3>
+              <div className="h-64 w-full rounded-lg border border-border overflow-hidden">
+                <AgCharts options={lineOptions} style={{ height: '100%' }} />
+              </div>
+            </section>
+          )}
 
           {/* Grafici */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
