@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY } from '../../ipc/types';
+import type { DashboardKPI, SerieMensile, BreakdownCategoria, TrendYoY, RiepilogoMensileResult } from '../../ipc/types';
 
 interface DashboardState {
   anno: number;
@@ -7,6 +7,7 @@ interface DashboardState {
   serieMensili: SerieMensile[];
   breakdownCategorie: BreakdownCategoria[];
   trend: TrendYoY | null;
+  riepilogoMensile: RiepilogoMensileResult | null;
   loading: boolean;
   error: string | null;
 
@@ -22,6 +23,7 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
   serieMensili: [],
   breakdownCategorie: [],
   trend: null,
+  riepilogoMensile: null,
   loading: false,
   error: null,
 
@@ -34,13 +36,14 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
     const { anno } = get();
     set({ loading: true, error: null });
     try {
-      const [kpi, serieMensili, breakdownCategorie, trend] = await Promise.all([
+      const [kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile] = await Promise.all([
         window.electronAPI.dashboard.kpi(anno),
         window.electronAPI.dashboard.serieMensili(anno),
         window.electronAPI.dashboard.breakdownCategorie(anno),
         window.electronAPI.dashboard.trendYoY(anno),
+        window.electronAPI.dashboard.riepilogoMensile(anno),
       ]);
-      set({ kpi, serieMensili, breakdownCategorie, trend, loading: false });
+      set({ kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile, loading: false });
     } catch (err) {
       set({ loading: false, error: String(err) });
     }

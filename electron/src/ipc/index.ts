@@ -22,6 +22,7 @@ import {
   getSerieMensili,
   getBreakdownCategorie,
   getTrendYoY,
+  getRiepilogoMensile,
 } from './dashboard';
 import { exportCsv, exportJson, importDb } from './export_import';
 import { getImpostazione, setImpostazione } from './impostazioni';
@@ -147,5 +148,8 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('dashboard:trend-yoy', (_e, { anno }: { anno: number }) =>
     getTrendYoY(db, anno),
+  );
+  ipcMain.handle('dashboard:riepilogo-mensile', (_e, { anno }: { anno: number }) =>
+    getRiepilogoMensile(db, anno),
   );
 }

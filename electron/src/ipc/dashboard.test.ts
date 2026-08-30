@@ -6,6 +6,7 @@ import {
   getSerieMensili,
   getBreakdownCategorie,
   getTrendYoY,
+  getRiepilogoMensile,
 } from './dashboard';
 import { createMovimento } from './movimenti';
 import { listCategorie } from './categorie';
@@ -235,5 +236,90 @@ describe('getTrendYoY', () => {
     createMovimento(db, { data: '2024-01-10', importo: 100, tipo: 'entrata' });
     const trend = getTrendYoY(db, 2024);
     expect(trend.delta_mesi_in_rosso).toBeNull();
+  });
+});
+
+describe('getRiepilogoMensile', () => {
+  it('restituisce sempre 12 righe anche senza movimenti', () => {
+    const result = getRiepilogoMensile(db, 2024);
+    expect(result.righe).toHaveLength(12);
+  });
+
+  it('mese senza movimenti ha tutti i valori a zero', () => {
+    const result = getRiepilogoMensile(db, 2024);
+    result.righe.forEach((r) => {
+      expect(r.entrate).toBe(0);
+      expect(r.uscite).toBe(0);
+      expect(r.saldo).toBe(0);
+    });
+  });
+
+  it('delta primo mese è null', () => {
+    seed();
+    const result = getRiepilogoMensile(db, 2024);
+    expect(result.righe[0].delta).toBeNull();
+  });
+
+  it('calcola saldo mensile corretto', () => {
+    seed();
+    const result = getRiepilogoMensile(db, 2024);
+    const gen = result.righe[0];
+    expect(gen.entrate).toBe(2000);
+    expect(gen.uscite).toBe(500);
+    expect(gen.saldo).toBe(1500);
+    const feb = result.righe[1];
+    expect(feb.saldo).toBe(-300);
+  });
+
+  it('calcola delta vs mese precedente', () => {
+    seed();
+    const result = getRiepilogoMensile(db, 2024);
+    expect(result.righe[1].delta).toBe(-1800);
+    expect(result.righe[2].delta).toBe(1000);
+    expect(result.righe[3].delta).toBe(-700);
+  });
+
+  it('footer totale = somma dei 12 mesi', () => {
+    seed();
+    const result = getRiepilogoMensile(db, 2024);
+    const totEntrate = result.righe.reduce((acc, r) => acc + r.entrate, 0);
+    const totUscite = result.righe.reduce((acc, r) => acc + r.uscite, 0);
+    const totSaldo = result.righe.reduce((acc, r) => acc + r.saldo, 0);
+    expect(result.totale.entrate).toBeCloseTo(totEntrate, 5);
+    expect(result.totale.uscite).toBeCloseTo(totUscite, 5);
+    expect(result.totale.saldo).toBeCloseTo(totSaldo, 5);
+  });
+
+  it('footer media = totale / 12', () => {
+    seed();
+    const result = getRiepilogoMensile(db, 2024);
+    expect(result.media.entrate).toBeCloseTo(result.totale.entrate / 12, 5);
+    expect(result.media.uscite).toBeCloseTo(result.totale.uscite / 12, 5);
+    expect(result.media.saldo).toBeCloseTo(result.totale.saldo / 12, 5);
+  });
+
+  it('footer mediana su 12 valori (media del 6° e 7°)', () => {
+    seed();
+    const result = getRiepilogoMensile(db, 2024);
+    const sorted = [...result.righe].sort((a, b) => a.saldo - b.saldo).map((r) => r.saldo);
+    const expectedMediana = (sorted[5] + sorted[6]) / 2;
+    expect(result.mediana.saldo).toBeCloseTo(expectedMediana, 5);
+  });
+
+  it('imposta nome_mese corretto', () => {
+    const result = getRiepilogoMensile(db, 2024);
+    expect(result.righe[0].nome_mese).toBe('Gen');
+    expect(result.righe[11].nome_mese).toBe('Dic');
+  });
+
+  it('mediana su serie dispari: sceglie elemento centrale', () => {
+    createMovimento(db, { data: '2024-01-01', importo: 10, tipo: 'entrata' });
+    createMovimento(db, { data: '2024-03-01', importo: 30, tipo: 'entrata' });
+    createMovimento(db, { data: '2024-05-01', importo: 50, tipo: 'entrata' });
+    const result = getRiepilogoMensile(db, 2024);
+    const sortedSaldos = [...result.righe].map((r) => r.saldo).sort((a, b) => a - b);
+    expect(sortedSaldos).toHaveLength(12);
+    const expectedMediana = (sortedSaldos[5] + sortedSaldos[6]) / 2;
+    expect(result.mediana.saldo).toBeCloseTo(expectedMediana, 5);
   });
 });

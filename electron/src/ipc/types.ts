@@ -103,3 +103,25 @@ export interface TrendYoY {
   delta_saldo_pct: number | null;
   delta_mesi_in_rosso: number | null;
 }
+
+export interface RiepilogoMensile {
+  mese: number;
+  nome_mese: string;
+  entrate: number;
+  uscite: number;
+  saldo: number;
+  delta: number | null;
+}
+
+export interface RiepilogoFooter {
+  entrate: number;
+  uscite: number;
+  saldo: number;
+}
+
+export interface RiepilogoMensileResult {
+  righe: RiepilogoMensile[];
+  totale: RiepilogoFooter;
+  media: RiepilogoFooter;
+  mediana: RiepilogoFooter;
+}

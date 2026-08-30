@@ -4,6 +4,7 @@ import type { AgChartOptions, AgChartTheme } from 'ag-charts-community';
 import { TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, PieChart } from 'lucide-react';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
 import { useDashboardStore } from '@/stores/dashboard';
+import type { RiepilogoMensileResult } from '../../../ipc/types';
 
 const COLOR_ENTRATE = '#22c55e';
 const COLOR_USCITE = '#ef4444';
@@ -186,11 +187,125 @@ function saldoColor(saldo: number): string {
   return 'text-foreground';
 }
 
+function DeltaCell({ delta }: { delta: number | null }) {
+  if (delta === null) return <span className="text-muted-foreground">—</span>;
+  const colorCls =
+    delta > 0
+      ? 'text-green-600 dark:text-green-400'
+      : delta < 0
+      ? 'text-red-600 dark:text-red-400'
+      : 'text-muted-foreground';
+  const Icon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
+  return (
+    <span className={`inline-flex items-center gap-0.5 tabular-nums ${colorCls}`}>
+      <Icon size={12} aria-hidden />
+      {delta > 0 ? '+' : ''}
+      {formatEuro(delta)}
+    </span>
+  );
+}
+
+interface RiepilogoMensileTableProps {
+  data: RiepilogoMensileResult;
+}
+
+function RiepilogoMensileTable({ data }: RiepilogoMensileTableProps) {
+  const { righe, totale, media, mediana } = data;
+
+  return (
+    <section aria-labelledby="riepilogo-heading">
+      <h3 id="riepilogo-heading" className="mb-3 text-sm font-medium text-muted-foreground">
+        Riepilogo mensile
+      </h3>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/40">
+              <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                Mese
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-2.5 text-right font-medium text-muted-foreground"
+              >
+                Entrate
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-2.5 text-right font-medium text-muted-foreground"
+              >
+                Uscite
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-2.5 text-right font-medium text-muted-foreground"
+              >
+                Saldo
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-2.5 text-right font-medium text-muted-foreground"
+              >
+                Δ vs mese prec.
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {righe.map((r) => (
+              <tr
+                key={r.mese}
+                className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
+              >
+                <td className="px-4 py-2 font-medium text-foreground">{r.nome_mese}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-green-600 dark:text-green-400">
+                  {r.entrate > 0 ? formatEuro(r.entrate) : <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums text-red-600 dark:text-red-400">
+                  {r.uscite > 0 ? formatEuro(r.uscite) : <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className={`px-4 py-2 text-right tabular-nums ${saldoColor(r.saldo)}`}>
+                  {formatEuro(r.saldo)}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <DeltaCell delta={r.delta} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            {(
+              [
+                { label: 'Totale', row: totale },
+                { label: 'Media', row: media },
+                { label: 'Mediana', row: mediana },
+              ] as const
+            ).map(({ label, row }) => (
+              <tr key={label} className="border-t border-border bg-muted/40 font-medium">
+                <td className="px-4 py-2 text-foreground">{label}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-green-600 dark:text-green-400">
+                  {formatEuro(row.entrate)}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums text-red-600 dark:text-red-400">
+                  {formatEuro(row.uscite)}
+                </td>
+                <td className={`px-4 py-2 text-right tabular-nums ${saldoColor(row.saldo)}`}>
+                  {formatEuro(row.saldo)}
+                </td>
+                <td className="px-4 py-2" />
+              </tr>
+            ))}
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function DashboardScreen() {
   const { theme } = useThemeStore();
   const isDark = getResolvedTheme(theme) === 'dark';
 
-  const { anno, kpi, serieMensili, breakdownCategorie, trend, loading, error, fetch, setAnno } =
+  const { anno, kpi, serieMensili, breakdownCategorie, trend, riepilogoMensile, loading, error, fetch, setAnno } =
     useDashboardStore();
 
   useEffect(() => {
@@ -290,6 +405,8 @@ export default function DashboardScreen() {
               />
             </div>
           </section>
+
+          {riepilogoMensile && <RiepilogoMensileTable data={riepilogoMensile} />}
 
           {/* Grafici */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
