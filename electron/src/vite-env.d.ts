@@ -39,6 +39,7 @@ declare global {
         create: (data: MovimentoCreate) => Promise<Movimento>;
         update: (id: number, data: MovimentoUpdate) => Promise<Movimento>;
         delete: (id: number) => Promise<void>;
+        restore: (movimento: Movimento) => Promise<void>;
       };
       dashboard: {
         kpi: (anno: number) => Promise<DashboardKPI>;

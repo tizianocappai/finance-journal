@@ -139,3 +139,28 @@ export function deleteMovimento(db: Database.Database, id: number): void {
     throw new Error(`Failed to delete movimento id=${id}: ${String(err)}`);
   }
 }
+
+export function restoreMovimento(db: Database.Database, movimento: Movimento): void {
+  try {
+    db
+      .prepare(
+        `INSERT OR REPLACE INTO movimenti
+           (id, data, importo, tipo, descrizione, categoria_id, metodo_id, dettaglio_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        movimento.id,
+        movimento.data,
+        movimento.importo,
+        movimento.tipo,
+        movimento.descrizione ?? null,
+        movimento.categoria_id ?? null,
+        movimento.metodo_id ?? null,
+        movimento.dettaglio_id ?? null,
+        movimento.created_at,
+        movimento.updated_at,
+      );
+  } catch (err) {
+    throw new Error(`Failed to restore movimento id=${movimento.id}: ${String(err)}`);
+  }
+}

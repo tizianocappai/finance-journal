@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './ipc/types';
+import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './ipc/types';
 
 
 try {
@@ -33,6 +33,8 @@ try {
         ipcRenderer.invoke('movimenti:update', { id, ...data }),
       delete: (id: number) =>
         ipcRenderer.invoke('movimenti:delete', { id }),
+      restore: (movimento: Movimento) =>
+        ipcRenderer.invoke('movimenti:restore', movimento),
     },
     dashboard: {
       kpi: (anno: number) => ipcRenderer.invoke('dashboard:kpi', { anno }),

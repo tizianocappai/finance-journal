@@ -6,7 +6,9 @@ import {
   createMovimento,
   updateMovimento,
   deleteMovimento,
+  restoreMovimento,
 } from './movimenti';
+import type { Movimento } from './types';
 import { listCategorie } from './categorie';
 import { listMetodi } from './metodi_pagamento';
 
@@ -189,5 +191,51 @@ describe('deleteMovimento', () => {
 
   it('lancia errore se il movimento non esiste', () => {
     expect(() => deleteMovimento(db, 9999)).toThrow();
+  });
+});
+
+describe('restoreMovimento', () => {
+  it('crea + elimina + restore → movimento riappare con stessi dati', () => {
+    const { cat, metodo } = seed(db);
+    const mov = createMovimento(db, {
+      data: '2024-03-15',
+      importo: 50,
+      tipo: 'uscita',
+      descrizione: 'Test restore',
+      categoria_id: cat.id,
+      metodo_id: metodo.id,
+    });
+    deleteMovimento(db, mov.id);
+    expect(listMovimenti(db)).toHaveLength(0);
+
+    restoreMovimento(db, mov);
+    const restored = listMovimenti(db);
+    expect(restored).toHaveLength(1);
+    expect(restored[0].id).toBe(mov.id);
+    expect(restored[0].data).toBe(mov.data);
+    expect(restored[0].importo).toBe(mov.importo);
+    expect(restored[0].tipo).toBe(mov.tipo);
+    expect(restored[0].descrizione).toBe(mov.descrizione);
+    expect(restored[0].categoria_id).toBe(mov.categoria_id);
+    expect(restored[0].metodo_id).toBe(mov.metodo_id);
+  });
+
+  it('restore su id inesistente non genera errori e inserisce il record', () => {
+    const fake: Movimento = {
+      id: 9999,
+      data: '2024-01-01',
+      importo: 100,
+      tipo: 'uscita',
+      descrizione: null,
+      categoria_id: null,
+      metodo_id: null,
+      dettaglio_id: null,
+      created_at: '2024-01-01T00:00:00',
+      updated_at: '2024-01-01T00:00:00',
+    };
+    expect(() => restoreMovimento(db, fake)).not.toThrow();
+    const all = listMovimenti(db);
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe(9999);
   });
 });

@@ -14,6 +14,7 @@ import {
   createMovimento,
   updateMovimento,
   deleteMovimento,
+  restoreMovimento,
 } from './movimenti';
 import {
   getDashboardKPI,
@@ -23,7 +24,7 @@ import {
 } from './dashboard';
 import { exportCsv, exportJson, importDb } from './export_import';
 import { getImpostazione, setImpostazione } from './impostazioni';
-import type { MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
+import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
 
 export function registerImpostazioniHandlers(
   ipcMain: IpcMain,
@@ -126,6 +127,9 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('movimenti:delete', (_e, { id }: { id: number }) =>
     deleteMovimento(db, id),
+  );
+  ipcMain.handle('movimenti:restore', (_e, movimento: Movimento) =>
+    restoreMovimento(db, movimento),
   );
 
   ipcMain.handle('dashboard:kpi', (_e, { anno }: { anno: number }) =>

@@ -7,6 +7,7 @@ import ResocontoLayout from '@/components/ResocontoLayout';
 import DashboardScreen from '@/components/screens/DashboardScreen';
 import MovimentiScreen from '@/components/screens/MovimentiScreen';
 import ImpostazioniScreen from '@/components/screens/ImpostazioniScreen';
+import Toast from '@/components/Toast';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -50,6 +51,7 @@ export default function App() {
           </Routes>
         </div>
       </div>
+      <Toast />
     </MemoryRouter>
   );
 }
