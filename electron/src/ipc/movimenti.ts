@@ -46,10 +46,12 @@ export function listMovimenti(
       SELECT
         m.*,
         c.nome  AS categoria_nome,
-        mp.nome AS metodo_nome
+        mp.nome AS metodo_nome,
+        d.nome  AS dettaglio_nome
       FROM movimenti m
       LEFT JOIN categorie c           ON c.id  = m.categoria_id
       LEFT JOIN metodi_pagamento mp   ON mp.id = m.metodo_id
+      LEFT JOIN dettagli d            ON d.id  = m.dettaglio_id
       ${where}
       ORDER BY m.data DESC, m.id DESC
     `;

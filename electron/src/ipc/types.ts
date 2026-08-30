@@ -38,6 +38,7 @@ export interface Movimento {
 export interface MovimentoWithLookup extends Movimento {
   categoria_nome: string | null;
   metodo_nome: string | null;
+  dettaglio_nome: string | null;
 }
 
 export interface MovimentoFilters {

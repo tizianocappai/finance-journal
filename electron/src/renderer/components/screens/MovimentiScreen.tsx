@@ -159,6 +159,14 @@ export default function MovimentiScreen() {
           (p.value as string | null) ?? '—',
       },
       {
+        field: 'dettaglio_nome',
+        headerName: 'Dettaglio',
+        flex: 1.5,
+        minWidth: 120,
+        valueFormatter: (p: ValueFormatterParams) =>
+          (p.value as string | null) ?? '—',
+      },
+      {
         field: 'metodo_nome',
         headerName: 'Metodo',
         flex: 1.5,

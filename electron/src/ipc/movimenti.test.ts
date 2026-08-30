@@ -12,6 +12,7 @@ import {
 import type { Movimento } from './types';
 import { listCategorie } from './categorie';
 import { listMetodi } from './metodi_pagamento';
+import { createDettaglio } from './dettagli';
 
 let db: Database.Database;
 
@@ -128,6 +129,28 @@ describe('listMovimenti', () => {
     const result = listMovimenti(db, { testo: 'Stipendio' });
     expect(result[0].categoria_nome).toBe(cat.nome);
     expect(result[0].metodo_nome).toBe(metodo.nome);
+  });
+
+  it('restituisce dettaglio_nome dal JOIN sui dettagli', () => {
+    const { cat } = seed(db);
+    const dettaglio = createDettaglio(db, 'Supermercato', cat.id);
+    createMovimento(db, {
+      data: '2024-01-10',
+      importo: 100,
+      tipo: 'uscita',
+      descrizione: 'DettSpesaUnica',
+      categoria_id: cat.id,
+      dettaglio_id: dettaglio.id,
+    });
+    const result = listMovimenti(db, { testo: 'DettSpesaUnica' });
+    expect(result).toHaveLength(1);
+    expect(result[0].dettaglio_nome).toBe('Supermercato');
+  });
+
+  it('restituisce dettaglio_nome null per movimenti senza dettaglio', () => {
+    createMovimento(db, { data: '2024-01-10', importo: 50, tipo: 'uscita' });
+    const result = listMovimenti(db);
+    expect(result[0].dettaglio_nome).toBeNull();
   });
 
   it('ordina per data DESC', () => {
