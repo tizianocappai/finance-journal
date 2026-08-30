@@ -22,11 +22,10 @@ const DONUT_COLORS = [
   '#14b8a6',
 ];
 
-const EURO_FMT = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
-const EURO_FMT_DEC = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
+const EURO_FMT = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
 
 function formatEuro(v: number): string {
-  return Math.abs(v) >= 1000 ? EURO_FMT.format(v) : EURO_FMT_DEC.format(v);
+  return EURO_FMT.format(v);
 }
 
 function buildBarTheme(isDark: boolean): AgChartTheme {
@@ -201,12 +200,7 @@ function saldoColor(saldo: number): string {
 
 function DeltaCell({ delta }: { delta: number | null }) {
   if (delta === null) return <span className="text-muted-foreground">—</span>;
-  const colorCls =
-    delta > 0
-      ? 'text-green-600 dark:text-green-400'
-      : delta < 0
-      ? 'text-red-600 dark:text-red-400'
-      : 'text-muted-foreground';
+  const colorCls = delta === 0 ? 'text-muted-foreground' : 'text-foreground';
   const Icon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
   return (
     <span className={`inline-flex items-center gap-0.5 tabular-nums ${colorCls}`}>
@@ -269,10 +263,10 @@ function RiepilogoMensileTable({ data }: RiepilogoMensileTableProps) {
                 className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
               >
                 <td className="px-4 py-2 font-medium text-foreground">{r.nome_mese}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-green-600 dark:text-green-400">
+                <td className="px-4 py-2 text-right tabular-nums text-foreground">
                   {r.entrate > 0 ? formatEuro(r.entrate) : <span className="text-muted-foreground">—</span>}
                 </td>
-                <td className="px-4 py-2 text-right tabular-nums text-red-600 dark:text-red-400">
+                <td className="px-4 py-2 text-right tabular-nums text-foreground">
                   {r.uscite > 0 ? formatEuro(r.uscite) : <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className={`px-4 py-2 text-right tabular-nums ${saldoColor(r.saldo)}`}>
@@ -294,10 +288,10 @@ function RiepilogoMensileTable({ data }: RiepilogoMensileTableProps) {
             ).map(({ label, row }) => (
               <tr key={label} className="border-t border-border bg-muted/40 font-medium">
                 <td className="px-4 py-2 text-foreground">{label}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-green-600 dark:text-green-400">
+                <td className="px-4 py-2 text-right tabular-nums text-foreground">
                   {formatEuro(row.entrate)}
                 </td>
-                <td className="px-4 py-2 text-right tabular-nums text-red-600 dark:text-red-400">
+                <td className="px-4 py-2 text-right tabular-nums text-foreground">
                   {formatEuro(row.uscite)}
                 </td>
                 <td className={`px-4 py-2 text-right tabular-nums ${saldoColor(row.saldo)}`}>
@@ -331,8 +325,6 @@ interface PivotCategorieTableProps {
 function PivotCategorieTable({ righe, tipo }: PivotCategorieTableProps) {
   const headingId = `pivot-${tipo}-heading`;
   const label = tipo === 'uscita' ? 'Uscite per Categoria' : 'Entrate per Categoria';
-  const amountCls =
-    tipo === 'uscita' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
 
   if (righe.length === 0) {
     return (
@@ -392,11 +384,11 @@ function PivotCategorieTable({ righe, tipo }: PivotCategorieTableProps) {
                   {r.categoria}
                 </td>
                 {r.mesi.map((v, i) => (
-                  <td key={i} className={`px-3 py-2 text-right tabular-nums ${v === 0 ? 'text-muted-foreground' : amountCls}`}>
+                  <td key={i} className={`px-3 py-2 text-right tabular-nums ${v === 0 ? 'text-muted-foreground' : 'text-foreground'}`}>
                     {v === 0 ? '—' : formatEuro(v)}
                   </td>
                 ))}
-                <td className={`px-3 py-2 text-right tabular-nums font-medium ${amountCls}`}>
+                <td className="px-3 py-2 text-right tabular-nums font-medium text-foreground">
                   {formatEuro(r.totale)}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
