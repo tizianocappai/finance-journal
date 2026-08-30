@@ -306,7 +306,24 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
             <label htmlFor="f-dettaglio" className={LABEL_CLS}>
               Dettaglio <span className="font-normal text-muted-foreground">(opzionale)</span>
             </label>
-            <select id="f-dettaglio" name="dettaglio_id" value={form.dettaglio_id} onChange={(e) => patch('dettaglio_id', e.target.value)} className={FIELD_CLS}>
+            <select
+              id="f-dettaglio"
+              name="dettaglio_id"
+              value={form.dettaglio_id}
+              onChange={(e) => {
+                const val = e.target.value;
+                const det = dettagli.find((d) => String(d.id) === val);
+                const hasCategoria = det?.categoria_id != null;
+                setForm((f) => ({
+                  ...f,
+                  dettaglio_id: val,
+                  ...(hasCategoria ? { categoria_id: String(det!.categoria_id) } : {}),
+                }));
+                if (errors.dettaglio_id) setErrors((e) => { const next = { ...e }; delete next.dettaglio_id; return next; });
+                if (hasCategoria) setCreatingCategoria(false);
+              }}
+              className={FIELD_CLS}
+            >
               <option value="">— Nessuno —</option>
               {dettagli.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
             </select>
