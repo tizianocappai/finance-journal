@@ -23,6 +23,8 @@ try {
       delete: (id: number) => ipcRenderer.invoke('dettagli:delete', { id }),
       updateCategoria: (id: number, categoria_id: number | null) =>
         ipcRenderer.invoke('dettagli:update-categoria', { id, categoria_id }),
+      countMovimenti: (id: number) =>
+        ipcRenderer.invoke('dettagli:count-movimenti', { id }) as Promise<number>,
     },
     movimenti: {
       list: (filters: MovimentoFilters = {}) =>

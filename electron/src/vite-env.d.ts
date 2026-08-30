@@ -37,6 +37,7 @@ declare global {
         create: (data: { nome: string; categoria_id?: number }) => Promise<Dettaglio>;
         delete: (id: number) => Promise<void>;
         updateCategoria: (id: number, categoria_id: number | null) => Promise<Dettaglio>;
+        countMovimenti: (id: number) => Promise<number>;
       };
       movimenti: {
         list: (filters?: MovimentoFilters) => Promise<MovimentoWithLookup[]>;

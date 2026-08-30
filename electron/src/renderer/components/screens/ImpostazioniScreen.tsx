@@ -3,7 +3,7 @@ import { Trash2, Plus, X } from 'lucide-react';
 import { useThemeStore, type Theme } from '@/stores/theme';
 import { useLookupStore } from '@/stores/lookup';
 import { cn } from '@/lib/utils';
-import type { Categoria, MetodoPagamento } from '../../../ipc/types';
+import type { Categoria, MetodoPagamento, Dettaglio } from '../../../ipc/types';
 import type { PreviewResult, ExecuteResult } from '../../../ipc/import_csv';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -158,6 +158,207 @@ function EntityList({ headingId, label, description, predefinedLabel, items, onA
           disabled={adding || !input.trim()}
           className={BTN_PRIMARY}
           aria-label={`Aggiungi ${label.toLowerCase()}`}
+        >
+          <Plus size={14} aria-hidden />
+        </button>
+      </form>
+
+      {err && <p role="alert" className="mt-1 text-xs text-destructive">{err}</p>}
+    </section>
+  );
+}
+
+// ─── dettagli list ────────────────────────────────────────────────────────────
+
+interface DettagliListProps {
+  items: Dettaglio[];
+  categorie: Categoria[];
+  onAdd: (nome: string, categoria_id?: number) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
+  onUpdateCategoria: (id: number, categoria_id: number | null) => Promise<void>;
+}
+
+function DettagliList({ items, categorie, onAdd, onDelete, onUpdateCategoria }: DettagliListProps) {
+  const [input, setInput] = useState('');
+  const [addCatId, setAddCatId] = useState<string>('');
+  const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; nome: string; count: number } | null>(null);
+  const [updatingCat, setUpdatingCat] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAdd() {
+    const nome = input.trim();
+    if (!nome) return;
+    setAdding(true);
+    setErr(null);
+    try {
+      const catId = addCatId ? Number(addCatId) : undefined;
+      await onAdd(nome, catId);
+      setInput('');
+      setAddCatId('');
+      inputRef.current?.focus();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleDeleteRequest(id: number, nome: string) {
+    setErr(null);
+    try {
+      const count = await window.electronAPI.dettagli.countMovimenti(id);
+      if (count > 0) {
+        setPendingDelete({ id, nome, count });
+      } else {
+        await doDelete(id);
+      }
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
+  async function doDelete(id: number) {
+    setDeleting(id);
+    setPendingDelete(null);
+    try {
+      await onDelete(id);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  async function handleCategoriaChange(id: number, value: string) {
+    setUpdatingCat(id);
+    setErr(null);
+    try {
+      await onUpdateCategoria(id, value ? Number(value) : null);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setUpdatingCat(null);
+    }
+  }
+
+  const SELECT_CLS = cn(
+    'rounded-md border border-border bg-background px-2 py-1 text-xs',
+    'text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring',
+    'disabled:opacity-50 disabled:cursor-not-allowed',
+  );
+
+  return (
+    <section aria-labelledby="dettagli-heading">
+      <SectionHeading id="dettagli-heading">Dettagli</SectionHeading>
+      <SectionDesc>
+        Aggiungi dettagli personalizzati e associali a una categoria. I dettagli predefiniti non sono eliminabili.
+      </SectionDesc>
+
+      {pendingDelete && (
+        <div
+          role="alertdialog"
+          aria-labelledby="del-warn-title"
+          aria-describedby="del-warn-desc"
+          className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
+        >
+          <p id="del-warn-title" className="font-medium text-destructive">
+            Elimina «{pendingDelete.nome}»?
+          </p>
+          <p id="del-warn-desc" className="mt-0.5 text-xs text-muted-foreground">
+            {pendingDelete.count} movement{pendingDelete.count === 1 ? 'o' : 'i'} usa{pendingDelete.count === 1 ? '' : 'no'} questo dettaglio. Il campo dettaglio verrà impostato a vuoto, la categoria rimarrà invariata.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => { void doDelete(pendingDelete.id); }}
+              disabled={deleting !== null}
+              className={`${BTN_BASE} border-destructive bg-destructive text-destructive-foreground hover:opacity-90 text-xs`}
+            >
+              Elimina comunque
+            </button>
+            <button
+              onClick={() => setPendingDelete(null)}
+              className={`${BTN_MUTED} text-xs`}
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ul role="list" className="mb-3 divide-y divide-border rounded-md border border-border">
+        {items.map((item) => (
+          <li key={item.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+            <span className={cn('flex-1 truncate', item.predefinito && 'text-muted-foreground')}>
+              {item.nome}
+              {item.predefinito ? (
+                <span className="ml-2 text-xs text-muted-foreground/60">(predefinito)</span>
+              ) : null}
+            </span>
+            <select
+              value={item.categoria_id ?? ''}
+              onChange={(e) => { void handleCategoriaChange(item.id, e.target.value); }}
+              disabled={updatingCat === item.id}
+              aria-label={`Categoria di ${item.nome}`}
+              className={SELECT_CLS}
+            >
+              <option value="">— nessuna —</option>
+              {categorie.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+            {!item.predefinito && (
+              <button
+                onClick={() => { void handleDeleteRequest(item.id, item.nome); }}
+                disabled={deleting === item.id || pendingDelete !== null}
+                aria-label={`Elimina ${item.nome}`}
+                className={BTN_GHOST}
+              >
+                <Trash2 size={14} aria-hidden />
+              </button>
+            )}
+          </li>
+        ))}
+        {items.length === 0 && (
+          <li className="px-3 py-2 text-xs text-muted-foreground">Nessun dettaglio.</li>
+        )}
+      </ul>
+
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => { e.preventDefault(); void handleAdd(); }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Nome dettaglio…"
+          aria-label="Nome nuovo dettaglio"
+          className={cn(
+            'flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm',
+            'text-foreground placeholder:text-muted-foreground',
+            'outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          )}
+        />
+        <select
+          value={addCatId}
+          onChange={(e) => setAddCatId(e.target.value)}
+          aria-label="Categoria nuovo dettaglio"
+          className={cn(SELECT_CLS, 'py-1.5')}
+        >
+          <option value="">— categoria —</option>
+          {categorie.map((c) => (
+            <option key={c.id} value={c.id}>{c.nome}</option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          disabled={adding || !input.trim()}
+          className={BTN_PRIMARY}
+          aria-label="Aggiungi dettaglio"
         >
           <Plus size={14} aria-hidden />
         </button>
@@ -343,7 +544,12 @@ function ImportCsvModal({ state, onConfirm, onClose }: ImportCsvModalProps) {
 
 export default function ImpostazioniScreen() {
   const { theme, setTheme } = useThemeStore();
-  const { categorie, metodi, syncCategorie, createCategoria, deleteCategoria, syncMetodi, createMetodo, deleteMetodo } = useLookupStore();
+  const {
+    categorie, metodi, dettagli,
+    syncCategorie, createCategoria, deleteCategoria,
+    syncMetodi, createMetodo, deleteMetodo,
+    syncDettagli, createDettaglio, deleteDettaglio, updateDettaglioCategoria,
+  } = useLookupStore();
 
   const [dbPath, setDbPath] = useState<string>('');
   const [valuta, setValuta] = useState('');
@@ -373,6 +579,7 @@ export default function ImpostazioniScreen() {
     })();
     void syncCategorie();
     void syncMetodi();
+    void syncDettagli();
   }, []);
 
   async function handleSavePreferenze() {
@@ -565,6 +772,15 @@ export default function ImpostazioniScreen() {
             items={metodiItems}
             onAdd={createMetodo}
             onDelete={deleteMetodo}
+          />
+
+          {/* Dettagli */}
+          <DettagliList
+            items={dettagli}
+            categorie={categorie}
+            onAdd={createDettaglio}
+            onDelete={deleteDettaglio}
+            onUpdateCategoria={updateDettaglioCategoria}
           />
 
           {/* Preferenze */}

@@ -8,6 +8,7 @@ import {
   createDettaglio,
   deleteDettaglio,
   updateDettaglioCategoria,
+  countMovimentiByDettaglio,
 } from './dettagli';
 import {
   listMovimenti,
@@ -140,6 +141,9 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('dettagli:update-categoria', (_e, { id, categoria_id }: { id: number; categoria_id: number | null }) =>
     updateDettaglioCategoria(db, id, categoria_id),
+  );
+  ipcMain.handle('dettagli:count-movimenti', (_e, { id }: { id: number }) =>
+    countMovimentiByDettaglio(db, id),
   );
 
   ipcMain.handle('movimenti:list', (_e, filters: MovimentoFilters = {}) =>

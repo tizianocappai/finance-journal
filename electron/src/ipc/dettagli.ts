@@ -49,6 +49,17 @@ export function deleteDettaglio(db: Database.Database, id: number): void {
   }
 }
 
+export function countMovimentiByDettaglio(db: Database.Database, id: number): number {
+  try {
+    const row = db
+      .prepare('SELECT COUNT(*) as cnt FROM movimenti WHERE dettaglio_id = ?')
+      .get(id) as { cnt: number };
+    return row.cnt;
+  } catch (err) {
+    throw new Error(`Failed to count movimenti for dettaglio id=${id}: ${String(err)}`);
+  }
+}
+
 export function updateDettaglioCategoria(
   db: Database.Database,
   id: number,

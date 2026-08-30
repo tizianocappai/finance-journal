@@ -6,6 +6,7 @@ import {
   createDettaglio,
   deleteDettaglio,
   updateDettaglioCategoria,
+  countMovimentiByDettaglio,
 } from './dettagli';
 import { listCategorie } from './categorie';
 
@@ -88,6 +89,24 @@ describe('deleteDettaglio', () => {
 
   it('lancia errore se il dettaglio non esiste', () => {
     expect(() => deleteDettaglio(db, 9999)).toThrow();
+  });
+});
+
+describe('countMovimentiByDettaglio', () => {
+  it('restituisce 0 se nessun movimento usa il dettaglio', () => {
+    const det = createDettaglio(db, 'Supermercato');
+    expect(countMovimentiByDettaglio(db, det.id)).toBe(0);
+  });
+
+  it('restituisce il numero corretto di movimenti associati', () => {
+    const det = createDettaglio(db, 'Supermercato');
+    db.prepare(
+      `INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-01', 30, 'uscita', ?)`,
+    ).run(det.id);
+    db.prepare(
+      `INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-02', 20, 'uscita', ?)`,
+    ).run(det.id);
+    expect(countMovimentiByDettaglio(db, det.id)).toBe(2);
   });
 });
 
