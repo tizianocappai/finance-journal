@@ -8,7 +8,12 @@ try {
       list: () => ipcRenderer.invoke('categorie:list'),
       create: (data: { nome: string; colore?: string; icona?: string }) =>
         ipcRenderer.invoke('categorie:create', data),
-      delete: (id: number) => ipcRenderer.invoke('categorie:delete', { id }),
+      update: (id: number, nome: string, colore?: string, icona?: string) =>
+        ipcRenderer.invoke('categorie:update', { id, nome, colore, icona }),
+      countMovimenti: (id: number) =>
+        ipcRenderer.invoke('categorie:count-movimenti', { id }) as Promise<number>,
+      delete: (id: number, targetCategoriaId: number) =>
+        ipcRenderer.invoke('categorie:delete', { id, targetCategoriaId }),
     },
     metodi_pagamento: {
       list: () => ipcRenderer.invoke('metodi_pagamento:list'),

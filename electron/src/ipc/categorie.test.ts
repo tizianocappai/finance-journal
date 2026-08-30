@@ -5,6 +5,8 @@ import {
   listCategorie,
   createCategoria,
   deleteCategoria,
+  updateCategoria,
+  countMovimentiByCategoria,
 } from './categorie';
 
 let db: Database.Database;
@@ -52,28 +54,69 @@ describe('createCategoria', () => {
   });
 });
 
+describe('updateCategoria', () => {
+  it('aggiorna nome e restituisce la categoria aggiornata', () => {
+    const cat = createCategoria(db, 'Hobby');
+    const updated = updateCategoria(db, cat.id, 'HobbyNew', '#ff0000', 'star');
+    expect(updated.nome).toBe('HobbyNew');
+    expect(updated.colore).toBe('#ff0000');
+    expect(updated.icona).toBe('star');
+  });
+
+  it('lancia errore se id non esiste', () => {
+    expect(() => updateCategoria(db, 9999, 'X')).toThrow(/non trovata/i);
+  });
+
+  it('lancia errore se nuovo nome già usato da altra categoria', () => {
+    createCategoria(db, 'A');
+    const b = createCategoria(db, 'B');
+    expect(() => updateCategoria(db, b.id, 'A')).toThrow();
+  });
+});
+
+describe('countMovimentiByCategoria', () => {
+  it('restituisce 0 se nessun movimento associato', () => {
+    const cat = createCategoria(db, 'Hobby');
+    expect(countMovimentiByCategoria(db, cat.id)).toBe(0);
+  });
+
+  it('restituisce il numero corretto di movimenti', () => {
+    const cat = createCategoria(db, 'Hobby');
+    db.prepare(
+      `INSERT INTO movimenti (data, importo, tipo, categoria_id) VALUES ('2024-01-01', 100, 'uscita', ?)`,
+    ).run(cat.id);
+    db.prepare(
+      `INSERT INTO movimenti (data, importo, tipo, categoria_id) VALUES ('2024-01-02', 200, 'uscita', ?)`,
+    ).run(cat.id);
+    expect(countMovimentiByCategoria(db, cat.id)).toBe(2);
+  });
+});
+
 describe('deleteCategoria', () => {
   it('elimina una categoria custom', () => {
+    const altro = listCategorie(db).find((c) => c.nome === 'Altro')!;
     const cat = createCategoria(db, 'Hobby');
-    deleteCategoria(db, cat.id);
+    deleteCategoria(db, cat.id, altro.id);
     const lista = listCategorie(db);
     expect(lista.map((c) => c.nome)).not.toContain('Hobby');
   });
 
-  it('blocca l\'eliminazione di una categoria predefinita', () => {
+  it('elimina una categoria predefinita senza errore', () => {
     const predefinita = listCategorie(db).find((c) => c.predefinita === 1)!;
-    expect(() => deleteCategoria(db, predefinita.id)).toThrow(/predefinita/i);
+    const altro = listCategorie(db).find((c) => c.predefinita === 1 && c.id !== predefinita.id) ??
+      createCategoria(db, 'Target');
+    expect(() => deleteCategoria(db, predefinita.id, altro.id)).not.toThrow();
   });
 
-  it('riassegna i movimenti alla categoria "Altro" prima di eliminare', () => {
+  it('riassegna i movimenti al targetCategoriaId prima di eliminare', () => {
+    const altro = listCategorie(db).find((c) => c.nome === 'Altro')!;
     const cat = createCategoria(db, 'Hobby');
     db.prepare(
       `INSERT INTO movimenti (data, importo, tipo, categoria_id) VALUES ('2024-01-01', 100, 'uscita', ?)`,
     ).run(cat.id);
 
-    deleteCategoria(db, cat.id);
+    deleteCategoria(db, cat.id, altro.id);
 
-    const altro = listCategorie(db).find((c) => c.nome === 'Altro')!;
     const mov = db
       .prepare('SELECT categoria_id FROM movimenti WHERE 1=1')
       .get() as { categoria_id: number };
@@ -81,6 +124,12 @@ describe('deleteCategoria', () => {
   });
 
   it('lancia errore se la categoria non esiste', () => {
-    expect(() => deleteCategoria(db, 9999)).toThrow();
+    const altro = listCategorie(db).find((c) => c.nome === 'Altro')!;
+    expect(() => deleteCategoria(db, 9999, altro.id)).toThrow();
+  });
+
+  it('lancia errore se targetCategoriaId non esiste', () => {
+    const cat = createCategoria(db, 'Hobby');
+    expect(() => deleteCategoria(db, cat.id, 9999)).toThrow();
   });
 });

@@ -1,7 +1,7 @@
 import type { IpcMain } from 'electron';
 import { dialog, app } from 'electron';
 import type Database from 'better-sqlite3';
-import { listCategorie, createCategoria, deleteCategoria } from './categorie';
+import { listCategorie, createCategoria, deleteCategoria, updateCategoria, countMovimentiByCategoria } from './categorie';
 import { listMetodi, createMetodo, deleteMetodo } from './metodi_pagamento';
 import {
   listDettagli,
@@ -120,8 +120,14 @@ export function registerLookupHandlers(
   ipcMain.handle('categorie:create', (_e, { nome, colore, icona }: { nome: string; colore?: string; icona?: string }) =>
     createCategoria(db, nome, colore, icona),
   );
-  ipcMain.handle('categorie:delete', (_e, { id }: { id: number }) =>
-    deleteCategoria(db, id),
+  ipcMain.handle('categorie:update', (_e, { id, nome, colore, icona }: { id: number; nome: string; colore?: string; icona?: string }) =>
+    updateCategoria(db, id, nome, colore, icona),
+  );
+  ipcMain.handle('categorie:count-movimenti', (_e, { id }: { id: number }) =>
+    countMovimentiByCategoria(db, id),
+  );
+  ipcMain.handle('categorie:delete', (_e, { id, targetCategoriaId }: { id: number; targetCategoriaId: number }) =>
+    deleteCategoria(db, id, targetCategoriaId),
   );
 
   ipcMain.handle('metodi_pagamento:list', () => listMetodi(db));
