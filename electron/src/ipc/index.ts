@@ -34,7 +34,18 @@ import {
 import { exportCsv, exportJson, importDb } from './export_import';
 import { previewCsv, executeCsv } from './import_csv';
 import { getImpostazione, setImpostazione } from './impostazioni';
-import { getGranularita, setGranularita } from './patrimonio';
+import {
+  getGranularita,
+  setGranularita,
+  listVoci,
+  createVoce,
+  updateVoce,
+  archiveVoce,
+  restoreVoce,
+  listValoriPerAnno,
+  listGruppi,
+  findOrCreateGruppo,
+} from './patrimonio';
 import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './types';
 
 export function registerImpostazioniHandlers(
@@ -222,5 +233,46 @@ export function registerPatrimonioHandlers(
   ipcMain.handle('patrimonio:get-granularita', () => getGranularita(db));
   ipcMain.handle('patrimonio:set-granularita', (_e, { valore }: { valore: Granularita }) =>
     setGranularita(db, valore),
+  );
+  ipcMain.handle('patrimonio:list-gruppi', () => listGruppi(db));
+  ipcMain.handle(
+    'patrimonio:list-voci',
+    (_e, { soloAttive }: { soloAttive: boolean }) => listVoci(db, soloAttive),
+  );
+  ipcMain.handle(
+    'patrimonio:create-voce',
+    (_e, { nome, tipo, gruppoNome, ordine }: { nome: string; tipo: 'attivo' | 'passivo'; gruppoNome?: string; ordine?: number }) => {
+      const gruppoId = gruppoNome?.trim() ? findOrCreateGruppo(db, gruppoNome, tipo).id : null;
+      return createVoce(db, nome, tipo, gruppoId, ordine ?? 0);
+    },
+  );
+  ipcMain.handle(
+    'patrimonio:update-voce',
+    (_e, { id, nome, gruppoNome, ordine }: { id: number; nome?: string; gruppoNome?: string | null; ordine?: number }) => {
+      const updates: { nome?: string; gruppo_id?: number | null; ordine?: number } = {};
+      if (nome !== undefined) updates.nome = nome;
+      if (ordine !== undefined) updates.ordine = ordine;
+      if (gruppoNome !== undefined) {
+        if (!gruppoNome?.trim()) {
+          updates.gruppo_id = null;
+        } else {
+          const voce = db
+            .prepare('SELECT tipo FROM patrimonio_voci WHERE id = ?')
+            .get(id) as { tipo: 'attivo' | 'passivo' } | undefined;
+          if (!voce) throw new Error(`Voce con id=${id} non trovata`);
+          updates.gruppo_id = findOrCreateGruppo(db, gruppoNome, voce.tipo).id;
+        }
+      }
+      return updateVoce(db, id, updates);
+    },
+  );
+  ipcMain.handle('patrimonio:archive-voce', (_e, { id }: { id: number }) =>
+    archiveVoce(db, id),
+  );
+  ipcMain.handle('patrimonio:restore-voce', (_e, { id }: { id: number }) =>
+    restoreVoce(db, id),
+  );
+  ipcMain.handle('patrimonio:list-valori', (_e, { anno }: { anno: number }) =>
+    listValoriPerAnno(db, anno),
   );
 }

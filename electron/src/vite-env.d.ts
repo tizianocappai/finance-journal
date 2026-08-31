@@ -19,6 +19,9 @@ import type {
   RiepilogoMensileResult,
   PivotCategoriaRiga,
   TrendMensile,
+  PatrimonioGruppo,
+  PatrimonioVoce,
+  PatrimonioValore,
 } from './ipc/types';
 import type { PreviewResult, ExecuteResult } from './ipc/import_csv';
 
@@ -80,6 +83,13 @@ declare global {
       patrimonio: {
         getGranularita: () => Promise<Granularita>;
         setGranularita: (valore: Granularita) => Promise<void>;
+        listGruppi: () => Promise<PatrimonioGruppo[]>;
+        listVoci: (soloAttive: boolean) => Promise<PatrimonioVoce[]>;
+        createVoce: (nome: string, tipo: 'attivo' | 'passivo', gruppoNome?: string, ordine?: number) => Promise<PatrimonioVoce>;
+        updateVoce: (id: number, updates: { nome?: string; gruppoNome?: string | null; ordine?: number }) => Promise<PatrimonioVoce>;
+        archiveVoce: (id: number) => Promise<void>;
+        restoreVoce: (id: number) => Promise<void>;
+        listValori: (anno: number) => Promise<PatrimonioValore[]>;
       };
     };
   }

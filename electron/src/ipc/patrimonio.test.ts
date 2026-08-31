@@ -17,6 +17,7 @@ import {
   getKpiPatrimonio,
   getGranularita,
   setGranularita,
+  findOrCreateGruppo,
 } from './patrimonio';
 
 let db: Database.Database;
@@ -290,6 +291,35 @@ describe('cascading', () => {
     deleteGruppo(db, g.id);
     const all = listVoci(db);
     expect(all.find((x) => x.id === v.id)?.gruppo_id).toBeNull();
+  });
+});
+
+describe('findOrCreateGruppo', () => {
+  it('crea un gruppo se non esiste', () => {
+    const g = findOrCreateGruppo(db, 'Liquidità', 'attivo');
+    expect(g.nome).toBe('Liquidità');
+    expect(g.tipo).toBe('attivo');
+    expect(listGruppi(db)).toHaveLength(1);
+  });
+
+  it('restituisce il gruppo esistente senza crearne uno nuovo', () => {
+    const g1 = findOrCreateGruppo(db, 'Liquidità', 'attivo');
+    const g2 = findOrCreateGruppo(db, 'Liquidità', 'attivo');
+    expect(g1.id).toBe(g2.id);
+    expect(listGruppi(db)).toHaveLength(1);
+  });
+
+  it('case-insensitive: "LIQUIDITÀ" trova "Liquidità"', () => {
+    const g1 = findOrCreateGruppo(db, 'Liquidità', 'attivo');
+    const g2 = findOrCreateGruppo(db, 'LIQUIDITÀ', 'attivo');
+    expect(g1.id).toBe(g2.id);
+  });
+
+  it('stesso nome tipo diverso crea gruppi separati', () => {
+    const g1 = findOrCreateGruppo(db, 'Investimenti', 'attivo');
+    const g2 = findOrCreateGruppo(db, 'Investimenti', 'passivo');
+    expect(g1.id).not.toBe(g2.id);
+    expect(listGruppi(db)).toHaveLength(2);
   });
 });
 

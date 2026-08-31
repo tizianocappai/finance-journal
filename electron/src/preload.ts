@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './ipc/types';
+import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts, PatrimonioVoce, PatrimonioValore, PatrimonioGruppo } from './ipc/types';
 
 
 try {
@@ -85,6 +85,20 @@ try {
         ipcRenderer.invoke('patrimonio:get-granularita') as Promise<Granularita>,
       setGranularita: (valore: Granularita) =>
         ipcRenderer.invoke('patrimonio:set-granularita', { valore }) as Promise<void>,
+      listGruppi: () =>
+        ipcRenderer.invoke('patrimonio:list-gruppi') as Promise<PatrimonioGruppo[]>,
+      listVoci: (soloAttive: boolean) =>
+        ipcRenderer.invoke('patrimonio:list-voci', { soloAttive }) as Promise<PatrimonioVoce[]>,
+      createVoce: (nome: string, tipo: 'attivo' | 'passivo', gruppoNome?: string, ordine?: number) =>
+        ipcRenderer.invoke('patrimonio:create-voce', { nome, tipo, gruppoNome, ordine }) as Promise<PatrimonioVoce>,
+      updateVoce: (id: number, updates: { nome?: string; gruppoNome?: string | null; ordine?: number }) =>
+        ipcRenderer.invoke('patrimonio:update-voce', { id, ...updates }) as Promise<PatrimonioVoce>,
+      archiveVoce: (id: number) =>
+        ipcRenderer.invoke('patrimonio:archive-voce', { id }) as Promise<void>,
+      restoreVoce: (id: number) =>
+        ipcRenderer.invoke('patrimonio:restore-voce', { id }) as Promise<void>,
+      listValori: (anno: number) =>
+        ipcRenderer.invoke('patrimonio:list-valori', { anno }) as Promise<PatrimonioValore[]>,
     },
   });
 } catch (err) {

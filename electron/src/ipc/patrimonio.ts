@@ -244,3 +244,24 @@ export function setGranularita(db: Database.Database, valore: Granularita): void
     throw new Error(`Failed to set granularita: ${String(err)}`);
   }
 }
+
+// --- Helpers ---
+
+export function findOrCreateGruppo(
+  db: Database.Database,
+  nome: string,
+  tipo: 'attivo' | 'passivo',
+): PatrimonioGruppo {
+  try {
+    const trimmed = nome.trim();
+    const all = db
+      .prepare('SELECT * FROM patrimonio_gruppi WHERE tipo = ?')
+      .all(tipo) as PatrimonioGruppo[];
+    const existing = all.find((g) => g.nome.toLowerCase() === trimmed.toLowerCase());
+    if (existing) return existing;
+    return createGruppo(db, trimmed, tipo);
+  } catch (err) {
+    if (err instanceof Error) throw err;
+    throw new Error(`Failed to find or create gruppo "${nome}": ${String(err)}`);
+  }
+}
