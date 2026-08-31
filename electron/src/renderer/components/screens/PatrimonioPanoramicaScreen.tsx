@@ -131,8 +131,7 @@ function VoceDialog({ open, mode, defaultTipo, voce, gruppoNomeIniziale = '', on
               id="voce-tipo"
               value={tipo}
               onChange={(e) => setTipo(e.target.value as 'attivo' | 'passivo')}
-              disabled={mode === 'edit'}
-              className={cn(FIELD_CLS, mode === 'edit' && 'opacity-60')}
+              className={FIELD_CLS}
             >
               <option value="attivo">Attivo</option>
               <option value="passivo">Passivo</option>
@@ -336,7 +335,7 @@ export default function PatrimonioPanoramicaScreen() {
 
   useEffect(() => {
     fetchVoci(anno);
-  }, [anno, fetchVoci]);
+  }, [anno, granularita, fetchVoci]);
 
   function openCreate(tipo: 'attivo' | 'passivo') {
     setDialog({ open: true, mode: 'create', defaultTipo: tipo });

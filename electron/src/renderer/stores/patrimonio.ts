@@ -66,7 +66,7 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   },
 
   addVoce: async (nome, tipo, gruppo) => {
-    const { voci, anno } = get();
+    const { voci } = get();
     const ordine = voci.filter((v) => v.tipo === tipo && v.attiva === 1).length;
     try {
       const nuova = await window.electronAPI.patrimonio.createVoce(nome, tipo, gruppo, ordine);

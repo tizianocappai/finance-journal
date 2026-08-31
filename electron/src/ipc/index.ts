@@ -234,45 +234,78 @@ export function registerPatrimonioHandlers(
   ipcMain.handle('patrimonio:set-granularita', (_e, { valore }: { valore: Granularita }) =>
     setGranularita(db, valore),
   );
-  ipcMain.handle('patrimonio:list-gruppi', () => listGruppi(db));
+  ipcMain.handle('patrimonio:list-gruppi', () => {
+    try {
+      return listGruppi(db);
+    } catch (err) {
+      throw new Error(`patrimonio:list-gruppi failed: ${String(err)}`);
+    }
+  });
   ipcMain.handle(
     'patrimonio:list-voci',
-    (_e, { soloAttive }: { soloAttive: boolean }) => listVoci(db, soloAttive),
+    (_e, { soloAttive }: { soloAttive: boolean }) => {
+      try {
+        return listVoci(db, soloAttive);
+      } catch (err) {
+        throw new Error(`patrimonio:list-voci failed: ${String(err)}`);
+      }
+    },
   );
   ipcMain.handle(
     'patrimonio:create-voce',
     (_e, { nome, tipo, gruppoNome, ordine }: { nome: string; tipo: 'attivo' | 'passivo'; gruppoNome?: string; ordine?: number }) => {
-      const gruppoId = gruppoNome?.trim() ? findOrCreateGruppo(db, gruppoNome, tipo).id : null;
-      return createVoce(db, nome, tipo, gruppoId, ordine ?? 0);
+      try {
+        const gruppoId = gruppoNome?.trim() ? findOrCreateGruppo(db, gruppoNome, tipo).id : null;
+        return createVoce(db, nome, tipo, gruppoId, ordine ?? 0);
+      } catch (err) {
+        throw new Error(`patrimonio:create-voce failed: ${String(err)}`);
+      }
     },
   );
   ipcMain.handle(
     'patrimonio:update-voce',
     (_e, { id, nome, gruppoNome, ordine }: { id: number; nome?: string; gruppoNome?: string | null; ordine?: number }) => {
-      const updates: { nome?: string; gruppo_id?: number | null; ordine?: number } = {};
-      if (nome !== undefined) updates.nome = nome;
-      if (ordine !== undefined) updates.ordine = ordine;
-      if (gruppoNome !== undefined) {
-        if (!gruppoNome?.trim()) {
-          updates.gruppo_id = null;
-        } else {
-          const voce = db
-            .prepare('SELECT tipo FROM patrimonio_voci WHERE id = ?')
-            .get(id) as { tipo: 'attivo' | 'passivo' } | undefined;
-          if (!voce) throw new Error(`Voce con id=${id} non trovata`);
-          updates.gruppo_id = findOrCreateGruppo(db, gruppoNome, voce.tipo).id;
+      try {
+        const updates: { nome?: string; gruppo_id?: number | null; ordine?: number } = {};
+        if (nome !== undefined) updates.nome = nome;
+        if (ordine !== undefined) updates.ordine = ordine;
+        if (gruppoNome !== undefined) {
+          if (!gruppoNome?.trim()) {
+            updates.gruppo_id = null;
+          } else {
+            const voce = db
+              .prepare('SELECT tipo FROM patrimonio_voci WHERE id = ?')
+              .get(id) as { tipo: 'attivo' | 'passivo' } | undefined;
+            if (!voce) throw new Error(`Voce con id=${id} non trovata`);
+            updates.gruppo_id = findOrCreateGruppo(db, gruppoNome, voce.tipo).id;
+          }
         }
+        return updateVoce(db, id, updates);
+      } catch (err) {
+        if (err instanceof Error) throw err;
+        throw new Error(`patrimonio:update-voce failed: ${String(err)}`);
       }
-      return updateVoce(db, id, updates);
     },
   );
-  ipcMain.handle('patrimonio:archive-voce', (_e, { id }: { id: number }) =>
-    archiveVoce(db, id),
-  );
-  ipcMain.handle('patrimonio:restore-voce', (_e, { id }: { id: number }) =>
-    restoreVoce(db, id),
-  );
-  ipcMain.handle('patrimonio:list-valori', (_e, { anno }: { anno: number }) =>
-    listValoriPerAnno(db, anno),
-  );
+  ipcMain.handle('patrimonio:archive-voce', (_e, { id }: { id: number }) => {
+    try {
+      return archiveVoce(db, id);
+    } catch (err) {
+      throw new Error(`patrimonio:archive-voce failed: ${String(err)}`);
+    }
+  });
+  ipcMain.handle('patrimonio:restore-voce', (_e, { id }: { id: number }) => {
+    try {
+      return restoreVoce(db, id);
+    } catch (err) {
+      throw new Error(`patrimonio:restore-voce failed: ${String(err)}`);
+    }
+  });
+  ipcMain.handle('patrimonio:list-valori', (_e, { anno }: { anno: number }) => {
+    try {
+      return listValoriPerAnno(db, anno);
+    } catch (err) {
+      throw new Error(`patrimonio:list-valori failed: ${String(err)}`);
+    }
+  });
 }
