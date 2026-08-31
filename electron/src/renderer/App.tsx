@@ -14,6 +14,20 @@ import Toast from '@/components/Toast';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
+function ElectronRequired() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+      <div className="max-w-sm text-center space-y-3">
+        <p className="text-lg font-semibold">App non disponibile nel browser</p>
+        <p className="text-sm text-muted-foreground">
+          No Budget richiede l&apos;app desktop Electron per funzionare. Avvia l&apos;app con{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">npm run dev</code> e usa la finestra Electron.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const { theme } = useThemeStore();
 
@@ -36,6 +50,8 @@ export default function App() {
       }
     }
   }, [theme]);
+
+  if (!('electronAPI' in window)) return <ElectronRequired />;
 
   return (
     <MemoryRouter initialEntries={['/resoconto/dashboard']}>

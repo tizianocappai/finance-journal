@@ -549,6 +549,27 @@ function VoceTable({
           archiviata ? 'opacity-50' : 'hover:bg-accent/30',
         )}
       >
+        <td
+          className={cn(
+            'px-3 py-1.5 font-medium text-foreground',
+            indented && 'pl-6',
+            !archiviata && 'cursor-pointer hover:underline',
+          )}
+          onClick={archiviata ? undefined : () => onEdit(voce)}
+        >
+          {voce.nome}
+        </td>
+        {periodiMesi.map((mese, i) => (
+          <td key={i} className="px-2 py-1.5">
+            {archiviata ? (
+              <span className="block text-right tabular-nums text-muted-foreground">
+                {formatOrDash(getRawCellValue(valori, voce.id, mese))}
+              </span>
+            ) : (
+              <InlineCell voceId={voce.id} mese={mese} valori={valori} onSave={onCellSave} />
+            )}
+          </td>
+        ))}
         <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-0.5">
             {!archiviata && (
@@ -590,27 +611,6 @@ function VoceTable({
             )}
           </div>
         </td>
-        <td
-          className={cn(
-            'px-3 py-1.5 font-medium text-foreground',
-            indented && 'pl-6',
-            !archiviata && 'cursor-pointer hover:underline',
-          )}
-          onClick={archiviata ? undefined : () => onEdit(voce)}
-        >
-          {voce.nome}
-        </td>
-        {periodiMesi.map((mese, i) => (
-          <td key={i} className="px-2 py-1.5">
-            {archiviata ? (
-              <span className="block text-right tabular-nums text-muted-foreground">
-                {formatOrDash(getRawCellValue(valori, voce.id, mese))}
-              </span>
-            ) : (
-              <InlineCell voceId={voce.id} mese={mese} valori={valori} onSave={onCellSave} />
-            )}
-          </td>
-        ))}
       </tr>
     );
   }
@@ -626,7 +626,6 @@ function VoceTable({
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border bg-muted/40">
-            <th className="w-20 px-2 py-2 text-left font-medium text-muted-foreground">Azioni</th>
             <th className="min-w-[140px] px-3 py-2 text-left font-medium text-muted-foreground">
               Voce
             </th>
@@ -635,6 +634,7 @@ function VoceTable({
                 {p}
               </th>
             ))}
+            <th className="w-20 px-2 py-2 text-left font-medium text-muted-foreground">Azioni</th>
           </tr>
         </thead>
         <tbody>
@@ -652,41 +652,6 @@ function VoceTable({
                   className="group/row border-b border-border bg-muted/25"
                   onContextMenu={(e) => { e.preventDefault(); setMenuOpen(isMenuOpen ? null : gruppo.id); }}
                 >
-                  <td className="px-2 py-1.5">
-                    <div className="relative">
-                      <button
-                        aria-label={`Opzioni gruppo ${gruppo.nome}`}
-                        onClick={() => setMenuOpen(isMenuOpen ? null : gruppo.id)}
-                        className={cn(
-                          'rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring',
-                          !isMenuOpen && 'opacity-0 group-hover/row:opacity-100 focus:opacity-100',
-                        )}
-                      >
-                        <MoreVertical size={13} />
-                      </button>
-                      {isMenuOpen && (
-                        <div
-                          role="menu"
-                          className="absolute left-0 top-full z-50 mt-1 w-32 rounded-md border border-border bg-card shadow-lg"
-                        >
-                          <button
-                            role="menuitem"
-                            className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent text-foreground"
-                            onClick={() => startRename(gruppo)}
-                          >
-                            Rinomina
-                          </button>
-                          <button
-                            role="menuitem"
-                            className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent text-destructive"
-                            onClick={() => { onDeleteGruppo(gruppo); setMenuOpen(null); }}
-                          >
-                            Elimina
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
                   <td
                     colSpan={periodi.length + 1}
                     className="px-3 py-1.5"
@@ -709,6 +674,41 @@ function VoceTable({
                       <span className="text-xs font-semibold text-foreground">{gruppo.nome}</span>
                     )}
                   </td>
+                  <td className="px-2 py-1.5">
+                    <div className="relative">
+                      <button
+                        aria-label={`Opzioni gruppo ${gruppo.nome}`}
+                        onClick={() => setMenuOpen(isMenuOpen ? null : gruppo.id)}
+                        className={cn(
+                          'rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring',
+                          !isMenuOpen && 'opacity-0 group-hover/row:opacity-100 focus:opacity-100',
+                        )}
+                      >
+                        <MoreVertical size={13} />
+                      </button>
+                      {isMenuOpen && (
+                        <div
+                          role="menu"
+                          className="absolute right-0 top-full z-50 mt-1 w-32 rounded-md border border-border bg-card shadow-lg"
+                        >
+                          <button
+                            role="menuitem"
+                            className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent text-foreground"
+                            onClick={() => startRename(gruppo)}
+                          >
+                            Rinomina
+                          </button>
+                          <button
+                            role="menuitem"
+                            className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent text-destructive"
+                            onClick={() => { onDeleteGruppo(gruppo); setMenuOpen(null); }}
+                          >
+                            Elimina
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
                 </tr>
 
                 {/* Voci del gruppo */}
@@ -716,7 +716,6 @@ function VoceTable({
 
                 {/* Subtotale */}
                 <tr className="border-b border-border bg-muted/10">
-                  <td />
                   <td className="px-3 py-1.5 pl-6 text-xs font-medium text-muted-foreground italic">
                     Subtotale
                   </td>
@@ -728,6 +727,7 @@ function VoceTable({
                       </td>
                     );
                   })}
+                  <td />
                 </tr>
               </Fragment>
             );

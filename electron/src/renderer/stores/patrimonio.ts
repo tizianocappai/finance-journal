@@ -53,12 +53,10 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   setAnno: (anno) => set({ anno }),
 
   setGranularita: async (granularita) => {
-    const previous = get().granularita;
     set({ granularita });
     try {
       await window.electronAPI.patrimonio.setGranularita(granularita);
     } catch (err) {
-      set({ granularita: previous });
       console.error('Failed to persist granularita:', err);
     }
   },

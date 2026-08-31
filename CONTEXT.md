@@ -69,6 +69,32 @@ Vista aggregata di un Anno Finanziario per una Sezione. Mostra: KPI sintetici (t
 **Workflow di release**: Pipeline GitHub Actions composta da tre job: `test` (verifica regressioni su ubuntu), `create-draft` (crea la draft release su GitHub), `build` (matrix su macOS 15/Windows/Linux che builda e carica gli artefatti). Il build richiede `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` per sopprimere un warning Vite che emerge in contesto CI durante la compilazione di moduli nativi.
 **DB path**: `app.getPath('userData')` di Electron — percorso cross-platform per i dati utente (Linux: `~/.config/`, macOS: `~/Library/Application Support/`, Windows: `%APPDATA%/`).
 
+## Modulo Patrimonio
+
+**PatrimonioVoce**
+Unità elementare di tracking patrimoniale (es. "Conto corrente", "Mutuo"). Ha un tipo (attivo o passivo), appartiene opzionalmente a un PatrimonioGruppo, e può essere archiviata associandola a un AnnoArchiviato. Una voce archiviata rimane visibile facoltativamente ma non è editabile.
+
+**PatrimonioGruppo**
+Aggregazione semantica di PatrimonioVoci dello stesso tipo (attivo o passivo). Usato per subtotali nella tabella e per la composizione nei grafici. Ogni PatrimonioVoce appartiene a zero o un PatrimonioGruppo.
+
+**PatrimonioValore**
+Importo monetario associato a una PatrimonioVoce per un dato anno e mese (o quarter). È il dato elementare del modulo Patrimonio. Un mese può non avere valore (cella vuota): questo è distinto da un valore esplicitamente zero.
+
+**Attivi**
+Insieme di PatrimonioVoci con tipo=attivo. Rappresentano risorse (liquidità, investimenti, immobili, ecc.). Il Totale Attivi è la somma degli ultimi PatrimonioValori disponibili per tutte le voci attive.
+
+**Passivi**
+Insieme di PatrimonioVoci con tipo=passivo. Rappresentano obbligazioni (mutui, prestiti, ecc.). Il Totale Passivi è la somma degli ultimi PatrimonioValori disponibili per tutte le voci passive.
+
+**Patrimonio Netto**
+Differenza tra Totale Attivi e Totale Passivi in un dato periodo. Valore positivo indica patrimonio netto positivo; valore negativo indica che i Passivi superano gli Attivi.
+
+**Granularità**
+Unità temporale di aggregazione dei PatrimonioValori: mensile (12 periodi, gennaio–dicembre) o trimestrale (4 periodi, Q1–Q4). La granularità è una preferenza persistita per sessione. Un cambio di granularità che nasconde valori già inseriti richiede conferma esplicita dell'utente.
+
+**AnnoArchiviato**
+Anno in cui una PatrimonioVoce è stata archiviata. Marca il momento in cui la voce cessa di essere attiva; non cancella i dati storici.
+
 ## Regole di dominio
 
 - L'importo di un Movimento è sempre un numero positivo. Il Tipo (Entrata/Uscita) ne determina il segno ai fini del calcolo del Saldo.
