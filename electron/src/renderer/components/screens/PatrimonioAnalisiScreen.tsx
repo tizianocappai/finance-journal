@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { AgCharts } from 'ag-charts-react';
 import type { AgCartesianChartOptions, AgPolarChartOptions } from 'ag-charts-types';
 import { usePatrimonioStore } from '@/stores/patrimonio';
-import type { PatrimonioGruppo, PatrimonioValore, PatrimonioVoce } from '../../../ipc/types';
+import type { PatrimonioGruppo, PatrimonioStorico, PatrimonioValore, PatrimonioVoce } from '../../../ipc/types';
 
 const MESI_LABEL = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 const QUARTERS_LABEL = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -243,14 +243,58 @@ function DonutChart({ title, data }: DonutChartProps) {
   );
 }
 
+// --- Line chart storico multi-anno ---
+
+interface StoricoLineChartProps {
+  storico: PatrimonioStorico;
+}
+
+function StoricoLineChart({ storico }: StoricoLineChartProps) {
+  if (storico.length === 0) return <EmptyChart label="Nessun dato storico disponibile" />;
+
+  const data = storico.map(({ anno, totaleAttivi, totalePassivi, patrimonioNetto }) => ({
+    anno: String(anno),
+    totaleAttivi,
+    totalePassivi,
+    patrimonioNetto,
+  }));
+
+  const options: AgCartesianChartOptions = {
+    data,
+    series: [
+      { type: 'line', xKey: 'anno', yKey: 'patrimonioNetto', yName: 'Patrimonio Netto' },
+      { type: 'line', xKey: 'anno', yKey: 'totaleAttivi', yName: 'Totale Attivi' },
+      { type: 'line', xKey: 'anno', yKey: 'totalePassivi', yName: 'Totale Passivi' },
+    ],
+    axes: {
+      x: { type: 'category' },
+      y: {
+        type: 'number',
+        label: { formatter: ({ value }: { value: number }) => formatEur(value) },
+      },
+    },
+    background: { fill: 'transparent' },
+  };
+
+  return (
+    <div style={{ height: 280 }}>
+      <AgCharts options={options} style={{ height: '100%' }} />
+    </div>
+  );
+}
+
 // --- Screen ---
 
 export default function PatrimonioAnalisiScreen() {
-  const { anno, granularita, voci, gruppi, valori, fetchVoci } = usePatrimonioStore();
+  const { anno, granularita, voci, gruppi, valori, storico, fetchVoci, fetchStorico } = usePatrimonioStore();
 
   useEffect(() => {
     fetchVoci(anno);
   }, [anno, granularita, fetchVoci]);
+
+  useEffect(() => {
+    fetchStorico();
+  }, [fetchStorico]);
 
   const attiviDonut = useMemo(
     () => buildDonutData('attivo', voci, gruppi, valori, anno, granularita),
@@ -263,24 +307,39 @@ export default function PatrimonioAnalisiScreen() {
   );
 
   return (
-    <div className="space-y-8">
-      <section aria-label="Patrimonio Netto nel tempo">
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Patrimonio Netto</h2>
-        <NettoLineChart anno={anno} granularita={granularita} voci={voci} valori={valori} />
-      </section>
+    <div className="space-y-10">
+      <div className="space-y-8">
+        <h2 className="text-base font-semibold text-foreground">Anno corrente</h2>
 
-      <section aria-label="Attivi e Passivi nel tempo">
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Attivi e Passivi</h2>
-        <AttiviPassiviAreaChart anno={anno} granularita={granularita} voci={voci} valori={valori} />
-      </section>
+        <section aria-label="Patrimonio Netto nel tempo">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Patrimonio Netto</h3>
+          <NettoLineChart anno={anno} granularita={granularita} voci={voci} valori={valori} />
+        </section>
 
-      <section aria-label="Composizione per gruppo">
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Composizione</h2>
-        <div className="grid grid-cols-2 gap-6">
-          <DonutChart title="Attivi per gruppo" data={attiviDonut} />
-          <DonutChart title="Passivi per gruppo" data={passiviDonut} />
-        </div>
-      </section>
+        <section aria-label="Attivi e Passivi nel tempo">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Attivi e Passivi</h3>
+          <AttiviPassiviAreaChart anno={anno} granularita={granularita} voci={voci} valori={valori} />
+        </section>
+
+        <section aria-label="Composizione per gruppo">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Composizione</h3>
+          <div className="grid grid-cols-2 gap-6">
+            <DonutChart title="Attivi per gruppo" data={attiviDonut} />
+            <DonutChart title="Passivi per gruppo" data={passiviDonut} />
+          </div>
+        </section>
+      </div>
+
+      <hr className="border-border" />
+
+      <div className="space-y-8">
+        <h2 className="text-base font-semibold text-foreground">Storico</h2>
+
+        <section aria-label="Andamento storico multi-anno">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Patrimonio Netto, Attivi e Passivi per anno</h3>
+          <StoricoLineChart storico={storico} />
+        </section>
+      </div>
     </div>
   );
 }
