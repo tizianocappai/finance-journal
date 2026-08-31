@@ -22,6 +22,10 @@ interface PatrimonioState {
   restoreVoce: (id: number) => Promise<void>;
   reorderVoce: (id: number, direction: 'up' | 'down') => Promise<void>;
   toggleMostraArchiviate: () => void;
+  fetchGruppi: () => Promise<void>;
+  createGruppo: (nome: string, tipo: 'attivo' | 'passivo') => Promise<PatrimonioGruppo>;
+  updateGruppo: (id: number, nome: string) => Promise<void>;
+  deleteGruppo: (id: number) => Promise<void>;
 }
 
 const currentYear = new Date().getFullYear();
@@ -192,4 +196,47 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   },
 
   toggleMostraArchiviate: () => set({ mostraArchiviate: !get().mostraArchiviate }),
+
+  fetchGruppi: async () => {
+    try {
+      const gruppi = await window.electronAPI.patrimonio.listGruppi();
+      set({ gruppi });
+    } catch (err) {
+      console.error('Failed to fetch gruppi:', err);
+    }
+  },
+
+  createGruppo: async (nome, tipo) => {
+    try {
+      const nuovo = await window.electronAPI.patrimonio.createGruppo(nome, tipo);
+      set({ gruppi: [...get().gruppi, nuovo] });
+      return nuovo;
+    } catch (err) {
+      console.error('Failed to create gruppo:', err);
+      throw err;
+    }
+  },
+
+  updateGruppo: async (id, nome) => {
+    try {
+      const aggiornato = await window.electronAPI.patrimonio.updateGruppo(id, nome);
+      set({ gruppi: get().gruppi.map((g) => (g.id === id ? aggiornato : g)) });
+    } catch (err) {
+      console.error('Failed to update gruppo:', err);
+      throw err;
+    }
+  },
+
+  deleteGruppo: async (id) => {
+    try {
+      await window.electronAPI.patrimonio.deleteGruppo(id);
+      set({
+        gruppi: get().gruppi.filter((g) => g.id !== id),
+        voci: get().voci.map((v) => (v.gruppo_id === id ? { ...v, gruppo_id: null } : v)),
+      });
+    } catch (err) {
+      console.error('Failed to delete gruppo:', err);
+      throw err;
+    }
+  },
 }));

@@ -48,6 +48,9 @@ import {
   getKpiPatrimonio,
   countValoriNascosti,
   listGruppi,
+  createGruppo,
+  updateGruppo,
+  deleteGruppo,
   findOrCreateGruppo,
 } from './patrimonio';
 import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './types';
@@ -243,6 +246,33 @@ export function registerPatrimonioHandlers(
       return listGruppi(db);
     } catch (err) {
       throw new Error(`patrimonio:list-gruppi failed: ${String(err)}`);
+    }
+  });
+  ipcMain.handle(
+    'patrimonio:create-gruppo',
+    (_e, { nome, tipo, ordine }: { nome: string; tipo: 'attivo' | 'passivo'; ordine?: number }) => {
+      try {
+        return createGruppo(db, nome, tipo, ordine ?? 0);
+      } catch (err) {
+        throw new Error(`patrimonio:create-gruppo failed: ${String(err)}`);
+      }
+    },
+  );
+  ipcMain.handle(
+    'patrimonio:update-gruppo',
+    (_e, { id, nome, ordine }: { id: number; nome: string; ordine?: number }) => {
+      try {
+        return updateGruppo(db, id, nome, ordine);
+      } catch (err) {
+        throw new Error(`patrimonio:update-gruppo failed: ${String(err)}`);
+      }
+    },
+  );
+  ipcMain.handle('patrimonio:delete-gruppo', (_e, { id }: { id: number }) => {
+    try {
+      return deleteGruppo(db, id);
+    } catch (err) {
+      throw new Error(`patrimonio:delete-gruppo failed: ${String(err)}`);
     }
   });
   ipcMain.handle(

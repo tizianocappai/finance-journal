@@ -87,6 +87,12 @@ try {
         ipcRenderer.invoke('patrimonio:set-granularita', { valore }) as Promise<void>,
       listGruppi: () =>
         ipcRenderer.invoke('patrimonio:list-gruppi') as Promise<PatrimonioGruppo[]>,
+      createGruppo: (nome: string, tipo: 'attivo' | 'passivo', ordine?: number) =>
+        ipcRenderer.invoke('patrimonio:create-gruppo', { nome, tipo, ordine }) as Promise<PatrimonioGruppo>,
+      updateGruppo: (id: number, nome: string, ordine?: number) =>
+        ipcRenderer.invoke('patrimonio:update-gruppo', { id, nome, ordine }) as Promise<PatrimonioGruppo>,
+      deleteGruppo: (id: number) =>
+        ipcRenderer.invoke('patrimonio:delete-gruppo', { id }) as Promise<void>,
       listVoci: (soloAttive: boolean) =>
         ipcRenderer.invoke('patrimonio:list-voci', { soloAttive }) as Promise<PatrimonioVoce[]>,
       createVoce: (nome: string, tipo: 'attivo' | 'passivo', gruppoNome?: string, ordine?: number) =>

@@ -85,6 +85,9 @@ declare global {
         getGranularita: () => Promise<Granularita>;
         setGranularita: (valore: Granularita) => Promise<void>;
         listGruppi: () => Promise<PatrimonioGruppo[]>;
+        createGruppo: (nome: string, tipo: 'attivo' | 'passivo', ordine?: number) => Promise<PatrimonioGruppo>;
+        updateGruppo: (id: number, nome: string, ordine?: number) => Promise<PatrimonioGruppo>;
+        deleteGruppo: (id: number) => Promise<void>;
         listVoci: (soloAttive: boolean) => Promise<PatrimonioVoce[]>;
         createVoce: (nome: string, tipo: 'attivo' | 'passivo', gruppoNome?: string, ordine?: number) => Promise<PatrimonioVoce>;
         updateVoce: (id: number, updates: { nome?: string; gruppoNome?: string | null; ordine?: number }) => Promise<PatrimonioVoce>;
