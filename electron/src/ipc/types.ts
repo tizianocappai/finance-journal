@@ -165,6 +165,7 @@ export interface PatrimonioVoce {
   tipo: 'attivo' | 'passivo';
   gruppo_id: number | null;
   attiva: number;
+  anno_archiviato: number | null;
   ordine: number;
   created_at: string;
 }

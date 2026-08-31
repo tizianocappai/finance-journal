@@ -75,7 +75,7 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   fetchVoci: async (anno) => {
     try {
       const [voci, gruppi, valori, kpi] = await Promise.all([
-        window.electronAPI.patrimonio.listVoci(false),
+        window.electronAPI.patrimonio.listVoci(false, anno),
         window.electronAPI.patrimonio.listGruppi(),
         window.electronAPI.patrimonio.listValori(anno),
         window.electronAPI.patrimonio.getKpi(anno),
@@ -142,9 +142,10 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   },
 
   archiveVoce: async (id) => {
+    const { anno } = get();
     try {
-      await window.electronAPI.patrimonio.archiveVoce(id);
-      set({ voci: get().voci.map((v) => (v.id === id ? { ...v, attiva: 0 } : v)) });
+      await window.electronAPI.patrimonio.archiveVoce(id, anno);
+      set({ voci: get().voci.map((v) => (v.id === id ? { ...v, attiva: 0, anno_archiviato: anno } : v)) });
     } catch (err) {
       console.error('Failed to archive voce:', err);
       throw err;
@@ -154,7 +155,7 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   restoreVoce: async (id) => {
     try {
       await window.electronAPI.patrimonio.restoreVoce(id);
-      set({ voci: get().voci.map((v) => (v.id === id ? { ...v, attiva: 1 } : v)) });
+      set({ voci: get().voci.map((v) => (v.id === id ? { ...v, attiva: 1, anno_archiviato: null } : v)) });
     } catch (err) {
       console.error('Failed to restore voce:', err);
       throw err;

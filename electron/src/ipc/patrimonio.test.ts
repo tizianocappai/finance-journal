@@ -98,10 +98,10 @@ describe('deleteGruppo', () => {
 });
 
 describe('listVoci', () => {
-  it('restituisce solo voci attive per default', () => {
+  it('restituisce solo voci attive per default (senza anno)', () => {
     const v1 = createVoce(db, 'Conto', 'attivo');
     const v2 = createVoce(db, 'Fondo', 'attivo');
-    archiveVoce(db, v2.id);
+    archiveVoce(db, v2.id, 2024);
     const list = listVoci(db);
     expect(list.map((v) => v.id)).toContain(v1.id);
     expect(list.map((v) => v.id)).not.toContain(v2.id);
@@ -110,7 +110,7 @@ describe('listVoci', () => {
   it('con soloAttive=false restituisce tutte le voci', () => {
     const v1 = createVoce(db, 'Conto', 'attivo');
     const v2 = createVoce(db, 'Fondo', 'attivo');
-    archiveVoce(db, v2.id);
+    archiveVoce(db, v2.id, 2024);
     const list = listVoci(db, false);
     expect(list.map((v) => v.id)).toContain(v1.id);
     expect(list.map((v) => v.id)).toContain(v2.id);
@@ -148,23 +148,54 @@ describe('updateVoce', () => {
 });
 
 describe('archiveVoce / restoreVoce', () => {
-  it('archiveVoce imposta attiva=0', () => {
+  it('archiveVoce imposta attiva=0 per l\'anno indicato e successivi', () => {
     const v = createVoce(db, 'Conto', 'attivo');
-    archiveVoce(db, v.id);
-    const all = listVoci(db, false);
-    expect(all.find((x) => x.id === v.id)?.attiva).toBe(0);
+    archiveVoce(db, v.id, 2027);
+    // In 2027 risulta archiviata
+    const all2027 = listVoci(db, false, 2027);
+    expect(all2027.find((x) => x.id === v.id)?.attiva).toBe(0);
   });
 
-  it('restoreVoce imposta attiva=1', () => {
+  it('voce archiviata nel 2027 rimane attiva nel 2026', () => {
     const v = createVoce(db, 'Conto', 'attivo');
-    archiveVoce(db, v.id);
+    upsertValore(db, v.id, 2026, 1, 1000);
+    archiveVoce(db, v.id, 2027);
+
+    // In 2026 la voce è ancora attiva
+    const attive2026 = listVoci(db, true, 2026);
+    expect(attive2026.find((x) => x.id === v.id)?.attiva).toBe(1);
+
+    // In 2027 non appare tra le attive
+    const attive2027 = listVoci(db, true, 2027);
+    expect(attive2027.find((x) => x.id === v.id)).toBeUndefined();
+
+    // Con soloAttive=false in 2027 compare come archiviata
+    const tutte2027 = listVoci(db, false, 2027);
+    expect(tutte2027.find((x) => x.id === v.id)?.attiva).toBe(0);
+  });
+
+  it('anno_archiviato = 2026: archiviata in 2025 e 2026', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    archiveVoce(db, v.id, 2026);
+    // 2025 è PRIMA dell'anno di archiviazione → attiva
+    const attive2025 = listVoci(db, true, 2025);
+    expect(attive2025.find((x) => x.id === v.id)?.attiva).toBe(1);
+    // 2026 è l'anno di archiviazione → non attiva
+    const attive2026 = listVoci(db, true, 2026);
+    expect(attive2026.find((x) => x.id === v.id)).toBeUndefined();
+  });
+
+  it('restoreVoce rimuove anno_archiviato: voce torna attiva in tutti gli anni', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    archiveVoce(db, v.id, 2027);
     restoreVoce(db, v.id);
-    const all = listVoci(db, false);
-    expect(all.find((x) => x.id === v.id)?.attiva).toBe(1);
+    // Dopo il ripristino torna attiva in qualsiasi anno
+    const attive2027 = listVoci(db, true, 2027);
+    expect(attive2027.find((x) => x.id === v.id)?.attiva).toBe(1);
   });
 
   it('archiveVoce lancia errore se id non esiste', () => {
-    expect(() => archiveVoce(db, 9999)).toThrow(/non trovata/i);
+    expect(() => archiveVoce(db, 9999, 2027)).toThrow(/non trovata/i);
   });
 
   it('restoreVoce lancia errore se id non esiste', () => {

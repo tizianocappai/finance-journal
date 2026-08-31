@@ -277,9 +277,9 @@ export function registerPatrimonioHandlers(
   });
   ipcMain.handle(
     'patrimonio:list-voci',
-    (_e, { soloAttive }: { soloAttive: boolean }) => {
+    (_e, { soloAttive, anno }: { soloAttive: boolean; anno?: number }) => {
       try {
-        return listVoci(db, soloAttive);
+        return listVoci(db, soloAttive, anno);
       } catch (err) {
         throw new Error(`patrimonio:list-voci failed: ${String(err)}`);
       }
@@ -321,9 +321,9 @@ export function registerPatrimonioHandlers(
       }
     },
   );
-  ipcMain.handle('patrimonio:archive-voce', (_e, { id }: { id: number }) => {
+  ipcMain.handle('patrimonio:archive-voce', (_e, { id, anno }: { id: number; anno: number }) => {
     try {
-      return archiveVoce(db, id);
+      return archiveVoce(db, id, anno);
     } catch (err) {
       throw new Error(`patrimonio:archive-voce failed: ${String(err)}`);
     }

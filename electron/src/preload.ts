@@ -93,14 +93,14 @@ try {
         ipcRenderer.invoke('patrimonio:update-gruppo', { id, nome, ordine }) as Promise<PatrimonioGruppo>,
       deleteGruppo: (id: number) =>
         ipcRenderer.invoke('patrimonio:delete-gruppo', { id }) as Promise<void>,
-      listVoci: (soloAttive: boolean) =>
-        ipcRenderer.invoke('patrimonio:list-voci', { soloAttive }) as Promise<PatrimonioVoce[]>,
+      listVoci: (soloAttive: boolean, anno?: number) =>
+        ipcRenderer.invoke('patrimonio:list-voci', { soloAttive, anno }) as Promise<PatrimonioVoce[]>,
       createVoce: (nome: string, tipo: 'attivo' | 'passivo', gruppoNome?: string, ordine?: number) =>
         ipcRenderer.invoke('patrimonio:create-voce', { nome, tipo, gruppoNome, ordine }) as Promise<PatrimonioVoce>,
       updateVoce: (id: number, updates: { nome?: string; gruppoNome?: string | null; ordine?: number }) =>
         ipcRenderer.invoke('patrimonio:update-voce', { id, ...updates }) as Promise<PatrimonioVoce>,
-      archiveVoce: (id: number) =>
-        ipcRenderer.invoke('patrimonio:archive-voce', { id }) as Promise<void>,
+      archiveVoce: (id: number, anno: number) =>
+        ipcRenderer.invoke('patrimonio:archive-voce', { id, anno }) as Promise<void>,
       restoreVoce: (id: number) =>
         ipcRenderer.invoke('patrimonio:restore-voce', { id }) as Promise<void>,
       listValori: (anno: number) =>

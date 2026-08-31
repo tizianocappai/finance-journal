@@ -88,10 +88,10 @@ declare global {
         createGruppo: (nome: string, tipo: 'attivo' | 'passivo', ordine?: number) => Promise<PatrimonioGruppo>;
         updateGruppo: (id: number, nome: string, ordine?: number) => Promise<PatrimonioGruppo>;
         deleteGruppo: (id: number) => Promise<void>;
-        listVoci: (soloAttive: boolean) => Promise<PatrimonioVoce[]>;
+        listVoci: (soloAttive: boolean, anno?: number) => Promise<PatrimonioVoce[]>;
         createVoce: (nome: string, tipo: 'attivo' | 'passivo', gruppoNome?: string, ordine?: number) => Promise<PatrimonioVoce>;
         updateVoce: (id: number, updates: { nome?: string; gruppoNome?: string | null; ordine?: number }) => Promise<PatrimonioVoce>;
-        archiveVoce: (id: number) => Promise<void>;
+        archiveVoce: (id: number, anno: number) => Promise<void>;
         restoreVoce: (id: number) => Promise<void>;
         listValori: (anno: number) => Promise<PatrimonioValore[]>;
         upsertValore: (voceId: number, anno: number, mese: number, importo: number) => Promise<PatrimonioValore>;

@@ -133,6 +133,21 @@ function migrateToV4(db: Database.Database): void {
   }
 }
 
+// Migration v5: aggiunge anno_archiviato a patrimonio_voci per archiviazione per-anno
+function migrateToV5(db: Database.Database): void {
+  try {
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE patrimonio_voci ADD COLUMN anno_archiviato INTEGER DEFAULT NULL;
+        UPDATE patrimonio_voci SET anno_archiviato = 0 WHERE attiva = 0;
+      `);
+      db.pragma('user_version = 5');
+    })();
+  } catch (err) {
+    throw new Error(`Failed to apply migration v5: ${String(err)}`);
+  }
+}
+
 // Migration v1: aggiunge predefinita/predefinito, riscrive dettagli come lookup, aggiunge dettaglio_id a movimenti
 function migrateToV1(db: Database.Database): void {
   db.transaction(() => {
@@ -272,6 +287,9 @@ export function initDatabase(dbPath?: string): Database.Database {
     }
     if (version < 4) {
       migrateToV4(db);
+    }
+    if (version < 5) {
+      migrateToV5(db);
     }
   } catch (err) {
     db.close();

@@ -71,8 +71,25 @@ export function deleteGruppo(db: Database.Database, id: number): void {
 
 // --- Voci ---
 
-export function listVoci(db: Database.Database, soloAttive = true): PatrimonioVoce[] {
+export function listVoci(db: Database.Database, soloAttive = true, anno?: number): PatrimonioVoce[] {
   try {
+    if (anno !== undefined) {
+      // Archiviazione per-anno: attiva = 1 se anno_archiviato IS NULL OR anno_archiviato > anno
+      const baseSelect = `
+        SELECT id, nome, tipo, gruppo_id, ordine, created_at, anno_archiviato,
+          CASE WHEN anno_archiviato IS NULL OR anno_archiviato > ? THEN 1 ELSE 0 END AS attiva
+        FROM patrimonio_voci
+      `;
+      if (soloAttive) {
+        return db
+          .prepare(`${baseSelect} WHERE (anno_archiviato IS NULL OR anno_archiviato > ?) ORDER BY tipo, ordine, nome`)
+          .all(anno, anno) as PatrimonioVoce[];
+      }
+      return db
+        .prepare(`${baseSelect} ORDER BY tipo, ordine, nome`)
+        .all(anno) as PatrimonioVoce[];
+    }
+    // Fallback senza anno: usa il flag attiva globale (backward compat)
     const sql = soloAttive
       ? 'SELECT * FROM patrimonio_voci WHERE attiva = 1 ORDER BY tipo, ordine, nome'
       : 'SELECT * FROM patrimonio_voci ORDER BY tipo, ordine, nome';
@@ -129,9 +146,11 @@ export function updateVoce(
   }
 }
 
-export function archiveVoce(db: Database.Database, id: number): void {
+export function archiveVoce(db: Database.Database, id: number, anno: number): void {
   try {
-    const info = db.prepare('UPDATE patrimonio_voci SET attiva = 0 WHERE id = ?').run(id);
+    const info = db
+      .prepare('UPDATE patrimonio_voci SET attiva = 0, anno_archiviato = ? WHERE id = ?')
+      .run(anno, id);
     if (info.changes === 0) throw new Error(`Voce con id=${id} non trovata`);
   } catch (err) {
     if (err instanceof Error) throw err;
@@ -141,7 +160,9 @@ export function archiveVoce(db: Database.Database, id: number): void {
 
 export function restoreVoce(db: Database.Database, id: number): void {
   try {
-    const info = db.prepare('UPDATE patrimonio_voci SET attiva = 1 WHERE id = ?').run(id);
+    const info = db
+      .prepare('UPDATE patrimonio_voci SET attiva = 1, anno_archiviato = NULL WHERE id = ?')
+      .run(id);
     if (info.changes === 0) throw new Error(`Voce con id=${id} non trovata`);
   } catch (err) {
     if (err instanceof Error) throw err;
