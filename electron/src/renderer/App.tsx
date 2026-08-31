@@ -4,10 +4,12 @@ import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { useThemeStore, getResolvedTheme } from '@/stores/theme';
 import Sidebar from '@/components/Sidebar';
 import ResocontoLayout from '@/components/ResocontoLayout';
+import PatrimonioLayout from '@/components/PatrimonioLayout';
 import DashboardScreen from '@/components/screens/DashboardScreen';
 import MovimentiScreen from '@/components/screens/MovimentiScreen';
 import ImpostazioniScreen from '@/components/screens/ImpostazioniScreen';
 import ResocontoImpostazioniScreen from '@/components/screens/ResocontoImpostazioniScreen';
+import PatrimonioPanoramicaScreen from '@/components/screens/PatrimonioPanoramicaScreen';
 import Toast from '@/components/Toast';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -47,6 +49,10 @@ export default function App() {
               <Route path="dashboard" element={<DashboardScreen />} />
               <Route path="movimenti" element={<MovimentiScreen />} />
               <Route path="impostazioni" element={<ResocontoImpostazioniScreen />} />
+            </Route>
+            <Route path="/patrimonio" element={<PatrimonioLayout />}>
+              <Route index element={<Navigate to="panoramica" replace />} />
+              <Route path="panoramica" element={<PatrimonioPanoramicaScreen />} />
             </Route>
             <Route path="/impostazioni" element={<ImpostazioniScreen />} />
             <Route path="*" element={<Navigate to="/resoconto/dashboard" replace />} />

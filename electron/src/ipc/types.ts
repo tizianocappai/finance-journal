@@ -1,3 +1,5 @@
+export type Granularita = 'mese' | 'quarter';
+
 export interface Categoria {
   id: number;
   nome: string;

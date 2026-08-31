@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './ipc/types';
+import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './ipc/types';
 
 
 try {
@@ -79,6 +79,12 @@ try {
         ipcRenderer.invoke('impostazioni:get', { chiave }) as Promise<string | null>,
       set: (chiave: string, valore: string) =>
         ipcRenderer.invoke('impostazioni:set', { chiave, valore }) as Promise<void>,
+    },
+    patrimonio: {
+      getGranularita: () =>
+        ipcRenderer.invoke('patrimonio:get-granularita') as Promise<Granularita>,
+      setGranularita: (valore: Granularita) =>
+        ipcRenderer.invoke('patrimonio:set-granularita', { valore }) as Promise<void>,
     },
   });
 } catch (err) {

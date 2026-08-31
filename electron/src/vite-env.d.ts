@@ -2,6 +2,7 @@
 
 import type {
   Categoria,
+  Granularita,
   MetodoPagamento,
   Dettaglio,
   DettaglioConFrequenza,
@@ -75,6 +76,10 @@ declare global {
         dbPath: () => Promise<string>;
         get: (chiave: string) => Promise<string | null>;
         set: (chiave: string, valore: string) => Promise<void>;
+      };
+      patrimonio: {
+        getGranularita: () => Promise<Granularita>;
+        setGranularita: (valore: Granularita) => Promise<void>;
       };
     };
   }

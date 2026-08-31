@@ -34,7 +34,8 @@ import {
 import { exportCsv, exportJson, importDb } from './export_import';
 import { previewCsv, executeCsv } from './import_csv';
 import { getImpostazione, setImpostazione } from './impostazioni';
-import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './types';
+import { getGranularita, setGranularita } from './patrimonio';
+import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './types';
 
 export function registerImpostazioniHandlers(
   ipcMain: IpcMain,
@@ -211,5 +212,15 @@ export function registerLookupHandlers(
     'dashboard:pivot-categorie',
     (_e, { anno, tipo }: { anno: number; tipo: 'uscita' | 'entrata' }) =>
       getPivotCategorie(db, anno, tipo),
+  );
+}
+
+export function registerPatrimonioHandlers(
+  ipcMain: IpcMain,
+  db: Database.Database,
+): void {
+  ipcMain.handle('patrimonio:get-granularita', () => getGranularita(db));
+  ipcMain.handle('patrimonio:set-granularita', (_e, { valore }: { valore: Granularita }) =>
+    setGranularita(db, valore),
   );
 }

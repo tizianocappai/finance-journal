@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { BarChart2, Settings, type LucideIcon } from 'lucide-react';
+import { BarChart2, Landmark, Settings, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -10,6 +10,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Resoconto Personale', to: '/resoconto', Icon: BarChart2 },
+  { label: 'Situazione Patrimoniale', to: '/patrimonio', Icon: Landmark },
   { label: 'Impostazioni', to: '/impostazioni', Icon: Settings },
 ];
 

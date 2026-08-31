@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { getImpostazione, setImpostazione } from './impostazioni';
-import type { KpiPatrimonio, PatrimonioGruppo, PatrimonioValore, PatrimonioVoce } from './types';
+import type { Granularita, KpiPatrimonio, PatrimonioGruppo, PatrimonioValore, PatrimonioVoce } from './types';
 
 // --- Gruppi ---
 
@@ -228,7 +228,7 @@ export function getKpiPatrimonio(db: Database.Database, anno: number): KpiPatrim
 
 const CHIAVE_GRANULARITA = 'patrimonio_granularita';
 
-export function getGranularita(db: Database.Database): 'mese' | 'quarter' {
+export function getGranularita(db: Database.Database): Granularita {
   try {
     const val = getImpostazione(db, CHIAVE_GRANULARITA);
     return val === 'quarter' ? 'quarter' : 'mese';
@@ -237,7 +237,7 @@ export function getGranularita(db: Database.Database): 'mese' | 'quarter' {
   }
 }
 
-export function setGranularita(db: Database.Database, valore: 'mese' | 'quarter'): void {
+export function setGranularita(db: Database.Database, valore: Granularita): void {
   try {
     setImpostazione(db, CHIAVE_GRANULARITA, valore);
   } catch (err) {
