@@ -72,6 +72,37 @@ function KpiTile({ label, value, colorCls, delta }: KpiTileProps) {
   );
 }
 
+function YtdTile({ ytd }: { ytd: KpiPatrimonio['ytdNetto'] }) {
+  const isPositive = ytd != null && ytd.percentuale > 0;
+  const isNegative = ytd != null && ytd.percentuale < 0;
+  const colorCls =
+    ytd == null
+      ? 'text-muted-foreground'
+      : isPositive
+        ? 'text-green-600 dark:text-green-400'
+        : isNegative
+          ? 'text-red-600 dark:text-red-400'
+          : 'text-muted-foreground';
+  const sign = isPositive ? '+' : '';
+  const pctStr = ytd != null ? `${sign}${ytd.percentuale.toFixed(1)}%` : '—';
+
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4">
+      <span className="text-xs font-medium text-muted-foreground">YTD</span>
+      <span className={cn('text-2xl font-semibold tabular-nums', colorCls)} aria-label={`YTD: ${pctStr}`}>
+        {pctStr}
+      </span>
+      {ytd != null ? (
+        <span className={cn('text-xs tabular-nums', colorCls)}>
+          {isPositive ? '▲' : isNegative ? '▼' : '→'} {ytd.assoluto >= 0 ? '+' : '−'}€{formatImporto(Math.abs(ytd.assoluto))}
+        </span>
+      ) : (
+        <span className="text-xs text-muted-foreground">Nessun dato</span>
+      )}
+    </div>
+  );
+}
+
 function PatrimonioKpiRow({ kpi }: { kpi: KpiPatrimonio }) {
   const nettoColor =
     kpi.patrimonioNetto >= 0
@@ -79,10 +110,11 @@ function PatrimonioKpiRow({ kpi }: { kpi: KpiPatrimonio }) {
       : 'text-red-600 dark:text-red-400';
 
   return (
-    <div className="grid grid-cols-3 gap-4" aria-label="KPI patrimonio">
+    <div className="grid grid-cols-4 gap-4" aria-label="KPI patrimonio">
       <KpiTile label="Totale Attivi" value={kpi.totaleAttivi} colorCls="text-green-600 dark:text-green-400" delta={kpi.deltaAttiviYoY} />
       <KpiTile label="Totale Passivi" value={kpi.totalePassivi} colorCls="text-red-600 dark:text-red-400" delta={kpi.deltaPassiviYoY} />
       <KpiTile label="Patrimonio Netto" value={kpi.patrimonioNetto} colorCls={nettoColor} delta={kpi.deltaNettoYoY} />
+      <YtdTile ytd={kpi.ytdNetto} />
     </div>
   );
 }

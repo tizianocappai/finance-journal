@@ -221,6 +221,28 @@ export function listValoriPerAnno(
 
 // --- KPI ---
 
+function queryKpiFirstPeriod(db: Database.Database, anno: number): { totaleAttivi: number; totalePassivi: number } {
+  try {
+    const rows = db
+      .prepare(
+        `SELECT pv.tipo, SUM(val.importo) as totale
+         FROM patrimonio_valori val
+         JOIN patrimonio_voci pv ON pv.id = val.voce_id
+         WHERE val.anno = ?
+           AND val.mese = (SELECT MIN(mese) FROM patrimonio_valori WHERE anno = ?)
+         GROUP BY pv.tipo`,
+      )
+      .all(anno, anno) as Array<{ tipo: string; totale: number }>;
+
+    return {
+      totaleAttivi: rows.find((r) => r.tipo === 'attivo')?.totale ?? 0,
+      totalePassivi: rows.find((r) => r.tipo === 'passivo')?.totale ?? 0,
+    };
+  } catch (err) {
+    throw new Error(`Failed to get first-period KPI anno=${anno}: ${String(err)}`);
+  }
+}
+
 function queryKpiTotals(db: Database.Database, anno: number): { totaleAttivi: number; totalePassivi: number } {
   const rows = db
     .prepare(
@@ -264,6 +286,10 @@ export function getKpiPatrimonio(db: Database.Database, anno: number): KpiPatrim
     const { totaleAttivi, totalePassivi } = queryKpiTotals(db, anno);
     const patrimonioNetto = totaleAttivi - totalePassivi;
 
+    const first = queryKpiFirstPeriod(db, anno);
+    const firstNetto = first.totaleAttivi - first.totalePassivi;
+    const ytdNetto = computeYoY(patrimonioNetto, firstNetto);
+
     const annoPrecedente = anno - 1;
     const hasPrevious = hasDataForAnno(db, annoPrecedente);
 
@@ -275,6 +301,7 @@ export function getKpiPatrimonio(db: Database.Database, anno: number): KpiPatrim
         deltaAttiviYoY: null,
         deltaPassiviYoY: null,
         deltaNettoYoY: null,
+        ytdNetto,
       };
     }
 
@@ -288,6 +315,7 @@ export function getKpiPatrimonio(db: Database.Database, anno: number): KpiPatrim
       deltaAttiviYoY: computeYoY(totaleAttivi, prev.totaleAttivi),
       deltaPassiviYoY: computeYoY(totalePassivi, prev.totalePassivi),
       deltaNettoYoY: computeYoY(patrimonioNetto, prevNetto),
+      ytdNetto,
     };
   } catch (err) {
     throw new Error(`Failed to get KPI patrimonio anno=${anno}: ${String(err)}`);

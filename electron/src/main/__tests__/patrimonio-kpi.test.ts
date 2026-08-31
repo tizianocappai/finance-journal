@@ -96,3 +96,48 @@ describe('getKpiPatrimonio — delta YoY', () => {
     expect(kpi.deltaPassiviYoY).toBeNull();
   });
 });
+
+describe('getKpiPatrimonio — ytdNetto', () => {
+  it('ytdNetto null se nessun dato', () => {
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.ytdNetto).toBeNull();
+  });
+
+  it('ytdNetto null se primo periodo netto = 0', () => {
+    const vA = createVoce(db, 'Conto', 'attivo');
+    const vP = createVoce(db, 'Mutuo', 'passivo');
+    upsertValore(db, vA.id, 2024, 1, 5000);
+    upsertValore(db, vP.id, 2024, 1, 5000);
+    upsertValore(db, vA.id, 2024, 6, 8000);
+    upsertValore(db, vP.id, 2024, 6, 4000);
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.ytdNetto).toBeNull();
+  });
+
+  it('calcola ytdNetto da primo a ultimo periodo disponibile', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 10000);
+    upsertValore(db, v.id, 2024, 6, 12000);
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.ytdNetto?.assoluto).toBe(2000);
+    expect(kpi.ytdNetto?.percentuale).toBeCloseTo(20, 1);
+  });
+
+  it('ytdNetto negativo quando il patrimonio scende', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 10000);
+    upsertValore(db, v.id, 2024, 6, 8000);
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.ytdNetto?.assoluto).toBe(-2000);
+    expect(kpi.ytdNetto?.percentuale).toBeCloseTo(-20, 1);
+  });
+
+  it('ytdNetto zero quando unico periodo disponibile', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 6, 10000);
+    const kpi = getKpiPatrimonio(db, 2024);
+    // primo = ultimo → delta = 0, ma computeYoY(10000, 10000) = { assoluto: 0, percentuale: 0 }
+    expect(kpi.ytdNetto?.assoluto).toBe(0);
+    expect(kpi.ytdNetto?.percentuale).toBe(0);
+  });
+});

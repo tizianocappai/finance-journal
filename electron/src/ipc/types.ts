@@ -190,6 +190,7 @@ export interface KpiPatrimonio {
   deltaAttiviYoY: KpiPatrimonioYoY | null;
   deltaPassiviYoY: KpiPatrimonioYoY | null;
   deltaNettoYoY: KpiPatrimonioYoY | null;
+  ytdNetto: KpiPatrimonioYoY | null;
 }
 
 export type PatrimonioStorico = Array<{
