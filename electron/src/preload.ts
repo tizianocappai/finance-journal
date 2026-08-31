@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts, PatrimonioVoce, PatrimonioValore, PatrimonioGruppo } from './ipc/types';
+import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts, PatrimonioVoce, PatrimonioValore, PatrimonioGruppo, KpiPatrimonio } from './ipc/types';
 
 
 try {
@@ -99,6 +99,14 @@ try {
         ipcRenderer.invoke('patrimonio:restore-voce', { id }) as Promise<void>,
       listValori: (anno: number) =>
         ipcRenderer.invoke('patrimonio:list-valori', { anno }) as Promise<PatrimonioValore[]>,
+      upsertValore: (voceId: number, anno: number, mese: number, importo: number) =>
+        ipcRenderer.invoke('patrimonio:upsert-valore', { voceId, anno, mese, importo }) as Promise<PatrimonioValore>,
+      deleteValore: (voceId: number, anno: number, mese: number) =>
+        ipcRenderer.invoke('patrimonio:delete-valore', { voceId, anno, mese }) as Promise<void>,
+      getKpi: (anno: number) =>
+        ipcRenderer.invoke('patrimonio:get-kpi', { anno }) as Promise<KpiPatrimonio>,
+      countValoriNascosti: (anno: number, nuovaGranularita: Granularita) =>
+        ipcRenderer.invoke('patrimonio:count-valori-nascosti', { anno, nuovaGranularita }) as Promise<number>,
     },
   });
 } catch (err) {

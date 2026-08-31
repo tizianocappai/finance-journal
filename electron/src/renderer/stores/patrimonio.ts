@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Granularita, PatrimonioGruppo, PatrimonioValore, PatrimonioVoce } from '../../ipc/types';
+import type { Granularita, KpiPatrimonio, PatrimonioGruppo, PatrimonioValore, PatrimonioVoce } from '../../ipc/types';
 
 interface PatrimonioState {
   anno: number;
@@ -7,11 +7,15 @@ interface PatrimonioState {
   voci: PatrimonioVoce[];
   gruppi: PatrimonioGruppo[];
   valori: PatrimonioValore[];
+  kpi: KpiPatrimonio | null;
   mostraArchiviate: boolean;
   setAnno: (anno: number) => void;
   setGranularita: (granularita: Granularita) => Promise<void>;
   loadGranularita: () => Promise<void>;
   fetchVoci: (anno: number) => Promise<void>;
+  upsertValore: (voceId: number, mese: number, importo: number) => Promise<void>;
+  deleteValore: (voceId: number, mese: number) => Promise<void>;
+  countValoriNascosti: (nuovaGranularita: Granularita) => Promise<number>;
   addVoce: (nome: string, tipo: 'attivo' | 'passivo', gruppo?: string) => Promise<void>;
   editVoce: (id: number, nome: string, gruppo: string) => Promise<void>;
   archiveVoce: (id: number) => Promise<void>;
@@ -22,12 +26,24 @@ interface PatrimonioState {
 
 const currentYear = new Date().getFullYear();
 
+async function refreshValoriAndKpi(
+  anno: number,
+  set: (partial: Partial<PatrimonioState>) => void,
+): Promise<void> {
+  const [valori, kpi] = await Promise.all([
+    window.electronAPI.patrimonio.listValori(anno),
+    window.electronAPI.patrimonio.getKpi(anno),
+  ]);
+  set({ valori, kpi });
+}
+
 export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   anno: currentYear,
   granularita: 'mese',
   voci: [],
   gruppi: [],
   valori: [],
+  kpi: null,
   mostraArchiviate: false,
 
   setAnno: (anno) => set({ anno }),
@@ -54,15 +70,43 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
 
   fetchVoci: async (anno) => {
     try {
-      const [voci, gruppi, valori] = await Promise.all([
+      const [voci, gruppi, valori, kpi] = await Promise.all([
         window.electronAPI.patrimonio.listVoci(false),
         window.electronAPI.patrimonio.listGruppi(),
         window.electronAPI.patrimonio.listValori(anno),
+        window.electronAPI.patrimonio.getKpi(anno),
       ]);
-      set({ voci, gruppi, valori });
+      set({ voci, gruppi, valori, kpi });
     } catch (err) {
       console.error('Failed to fetch voci:', err);
     }
+  },
+
+  upsertValore: async (voceId, mese, importo) => {
+    const { anno } = get();
+    try {
+      await window.electronAPI.patrimonio.upsertValore(voceId, anno, mese, importo);
+      await refreshValoriAndKpi(anno, set);
+    } catch (err) {
+      console.error('Failed to upsert valore:', err);
+      throw err;
+    }
+  },
+
+  deleteValore: async (voceId, mese) => {
+    const { anno } = get();
+    try {
+      await window.electronAPI.patrimonio.deleteValore(voceId, anno, mese);
+      await refreshValoriAndKpi(anno, set);
+    } catch (err) {
+      console.error('Failed to delete valore:', err);
+      throw err;
+    }
+  },
+
+  countValoriNascosti: async (nuovaGranularita) => {
+    const { anno } = get();
+    return window.electronAPI.patrimonio.countValoriNascosti(anno, nuovaGranularita);
   },
 
   addVoce: async (nome, tipo, gruppo) => {

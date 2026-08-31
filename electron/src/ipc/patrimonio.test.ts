@@ -15,6 +15,7 @@ import {
   deleteValore,
   listValoriPerAnno,
   getKpiPatrimonio,
+  countValoriNascosti,
   getGranularita,
   setGranularita,
   findOrCreateGruppo,
@@ -337,5 +338,39 @@ describe('getGranularita / setGranularita', () => {
     setGranularita(db, 'quarter');
     setGranularita(db, 'mese');
     expect(getGranularita(db)).toBe('mese');
+  });
+});
+
+describe('countValoriNascosti', () => {
+  it('restituisce 0 se nuova granularità è mese', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2025, 1, 100);
+    upsertValore(db, v.id, 2025, 2, 200);
+    expect(countValoriNascosti(db, 2025, 'mese')).toBe(0);
+  });
+
+  it('restituisce 0 se nessun valore nascosto passando a quarter', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2025, 3, 100);
+    upsertValore(db, v.id, 2025, 6, 200);
+    upsertValore(db, v.id, 2025, 9, 300);
+    upsertValore(db, v.id, 2025, 12, 400);
+    expect(countValoriNascosti(db, 2025, 'quarter')).toBe(0);
+  });
+
+  it('conta i mesi non-quarter (es. gennaio, febbraio)', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2025, 1, 100);
+    upsertValore(db, v.id, 2025, 2, 200);
+    upsertValore(db, v.id, 2025, 3, 300);
+    expect(countValoriNascosti(db, 2025, 'quarter')).toBe(2);
+  });
+
+  it('conta solo i valori per l anno specificato', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 100);
+    upsertValore(db, v.id, 2025, 3, 300);
+    expect(countValoriNascosti(db, 2025, 'quarter')).toBe(0);
+    expect(countValoriNascosti(db, 2024, 'quarter')).toBe(1);
   });
 });

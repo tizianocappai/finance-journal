@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useMatch } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePatrimonioStore } from '@/stores/patrimonio';
 import type { Granularita } from '../../ipc/types';
@@ -37,11 +37,39 @@ function TabChip({ label, to }: { label: string; to: string }) {
 }
 
 export default function PatrimonioLayout() {
-  const { anno, granularita, setAnno, setGranularita, loadGranularita } = usePatrimonioStore();
+  const { anno, granularita, setAnno, setGranularita, loadGranularita, countValoriNascosti } = usePatrimonioStore();
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     loadGranularita();
   }, [loadGranularita]);
+
+  useEffect(() => {
+    return () => clearTimeout(toastTimerRef.current);
+  }, []);
+
+  function showToast(msg: string) {
+    clearTimeout(toastTimerRef.current);
+    setToastMsg(msg);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 4500);
+  }
+
+  async function handleGranularitaChange(nuova: Granularita) {
+    try {
+      const count = await countValoriNascosti(nuova);
+      if (count > 0) {
+        const modalita = nuova === 'quarter' ? 'trimestrale' : 'mensile';
+        const plurale = count === 1;
+        showToast(
+          `${count} valor${plurale ? 'e' : 'i'} non sar${plurale ? 'à' : 'anno'} visibil${plurale ? 'e' : 'i'} in modalità ${modalita}. I dati non sono persi.`,
+        );
+      }
+    } catch (err) {
+      console.error('Failed to count valori nascosti:', err);
+    }
+    await setGranularita(nuova);
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -72,7 +100,7 @@ export default function PatrimonioLayout() {
 
             <select
               value={granularita}
-              onChange={(e) => setGranularita(e.target.value as Granularita)}
+              onChange={(e) => handleGranularitaChange(e.target.value as Granularita)}
               aria-label="Granularità"
               className={cn(
                 'h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground',
@@ -98,6 +126,23 @@ export default function PatrimonioLayout() {
       <main className="flex-1 overflow-auto p-6">
         <Outlet />
       </main>
+
+      {toastMsg && (
+        <div
+          role="status"
+          aria-atomic="true"
+          className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-border bg-background px-4 py-3 shadow-md"
+        >
+          <span className="flex-1 text-sm text-foreground">{toastMsg}</span>
+          <button
+            onClick={() => setToastMsg(null)}
+            aria-label="Chiudi notifica"
+            className="mt-0.5 shrink-0 rounded text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

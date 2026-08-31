@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronUp, ChevronDown, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePatrimonioStore } from '@/stores/patrimonio';
-import type { PatrimonioVoce, PatrimonioValore } from '../../../ipc/types';
+import type { KpiPatrimonio, PatrimonioVoce, PatrimonioValore } from '../../../ipc/types';
 
 const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -22,15 +22,139 @@ function formatImporto(importo: number): string {
   }).format(importo);
 }
 
-function getCellValue(valori: PatrimonioValore[], voceId: number, mese: number): string {
+function getRawCellValue(valori: PatrimonioValore[], voceId: number, mese: number): number | null {
   const v = valori.find((x) => x.voce_id === voceId && x.mese === mese);
-  return v != null ? formatImporto(v.importo) : '—';
+  return v != null ? v.importo : null;
 }
 
-function getQuarterValue(valori: PatrimonioValore[], voceId: number, quarter: number): string {
-  const lastMese = quarter * 3;
-  return getCellValue(valori, voceId, lastMese);
+function formatOrDash(raw: number | null): string {
+  return raw != null ? formatImporto(raw) : '—';
 }
+
+// --- KPI ---
+
+interface KpiTileProps {
+  label: string;
+  value: number;
+  colorCls?: string;
+}
+
+function KpiTile({ label, value, colorCls }: KpiTileProps) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className={cn('text-2xl font-semibold tabular-nums', colorCls ?? 'text-foreground')}>
+        {formatImporto(value)}
+      </span>
+    </div>
+  );
+}
+
+function PatrimonioKpiRow({ kpi }: { kpi: KpiPatrimonio }) {
+  const nettoColor =
+    kpi.patrimonioNetto >= 0
+      ? 'text-green-600 dark:text-green-400'
+      : 'text-red-600 dark:text-red-400';
+
+  return (
+    <div className="grid grid-cols-3 gap-4" aria-label="KPI patrimonio">
+      <KpiTile label="Totale Attivi" value={kpi.totaleAttivi} colorCls="text-green-600 dark:text-green-400" />
+      <KpiTile label="Totale Passivi" value={kpi.totalePassivi} colorCls="text-red-600 dark:text-red-400" />
+      <KpiTile label="Patrimonio Netto" value={kpi.patrimonioNetto} colorCls={nettoColor} />
+    </div>
+  );
+}
+
+// --- Inline cell ---
+
+interface InlineCellProps {
+  voceId: number;
+  mese: number;
+  valori: PatrimonioValore[];
+  onSave: (voceId: number, mese: number, value: number | null) => Promise<void>;
+}
+
+function InlineCell({ voceId, mese, valori, onSave }: InlineCellProps) {
+  const [editing, setEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cancelRef = useRef(false);
+
+  const raw = getRawCellValue(valori, voceId, mese);
+  const display = raw != null ? formatImporto(raw) : '—';
+
+  function startEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    cancelRef.current = false;
+    setInputValue(raw != null ? String(raw) : '');
+    setEditing(true);
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 10);
+  }
+
+  async function commit() {
+    if (cancelRef.current) return;
+    setEditing(false);
+    const trimmed = inputValue.trim();
+    const num = trimmed === '' ? NaN : parseFloat(trimmed.replace(',', '.'));
+    try {
+      await onSave(voceId, mese, isNaN(num) ? null : num);
+    } catch {
+      // error surfaced via store
+    }
+  }
+
+  function cancel() {
+    cancelRef.current = true;
+    setEditing(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    }
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      cancel();
+    }
+  }
+
+  if (!editing) {
+    return (
+      <span
+        role="button"
+        tabIndex={0}
+        title="Clicca per modificare"
+        onClick={startEdit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') startEdit(e as unknown as React.MouseEvent);
+        }}
+        className="block cursor-text text-right tabular-nums text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+      >
+        {display}
+      </span>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="number"
+      step="any"
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onBlur={commit}
+      onClick={(e) => e.stopPropagation()}
+      className="w-full rounded border border-ring bg-background px-1 py-0.5 text-right text-xs tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+    />
+  );
+}
+
+// --- VoceDialog ---
 
 interface VoceDialogProps {
   open: boolean;
@@ -166,6 +290,8 @@ function VoceDialog({ open, mode, defaultTipo, voce, gruppoNomeIniziale = '', on
   );
 }
 
+// --- VoceTable ---
+
 interface VoceTableProps {
   tipo: 'attivo' | 'passivo';
   voci: PatrimonioVoce[];
@@ -176,6 +302,7 @@ interface VoceTableProps {
   onArchive: (id: number) => void;
   onRestore: (id: number) => void;
   onReorder: (id: number, direction: 'up' | 'down') => void;
+  onCellSave: (voceId: number, mese: number, value: number | null) => Promise<void>;
 }
 
 function VoceTable({
@@ -188,6 +315,7 @@ function VoceTable({
   onArchive,
   onRestore,
   onReorder,
+  onCellSave,
 }: VoceTableProps) {
   const attive = voci
     .filter((v) => v.tipo === tipo && v.attiva === 1)
@@ -233,9 +361,8 @@ function VoceTable({
                   'border-b border-border last:border-0 transition-colors',
                   archiviata
                     ? 'opacity-50'
-                    : 'cursor-pointer hover:bg-accent/30',
+                    : 'hover:bg-accent/30',
                 )}
-                onClick={archiviata ? undefined : () => onEdit(voce)}
               >
                 <td
                   className="px-2 py-1.5"
@@ -281,18 +408,54 @@ function VoceTable({
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-1.5 font-medium text-foreground">{voce.nome}</td>
+                <td
+                  className={cn(
+                    'px-3 py-1.5 font-medium text-foreground',
+                    !archiviata && 'cursor-pointer hover:underline',
+                  )}
+                  onClick={archiviata ? undefined : () => onEdit(voce)}
+                >
+                  {voce.nome}
+                </td>
                 {granularita === 'mese'
-                  ? MESI.map((_, i) => (
-                      <td key={i} className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                        {getCellValue(valori, voce.id, i + 1)}
-                      </td>
-                    ))
-                  : QUARTERS.map((_, i) => (
-                      <td key={i} className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                        {getQuarterValue(valori, voce.id, i + 1)}
-                      </td>
-                    ))}
+                  ? MESI.map((_, i) => {
+                      const mese = i + 1;
+                      return (
+                        <td key={i} className="px-2 py-1.5">
+                          {archiviata ? (
+                            <span className="block text-right tabular-nums text-muted-foreground">
+                              {formatOrDash(getRawCellValue(valori, voce.id, mese))}
+                            </span>
+                          ) : (
+                            <InlineCell
+                              voceId={voce.id}
+                              mese={mese}
+                              valori={valori}
+                              onSave={onCellSave}
+                            />
+                          )}
+                        </td>
+                      );
+                    })
+                  : QUARTERS.map((_, i) => {
+                      const lastMese = (i + 1) * 3;
+                      return (
+                        <td key={i} className="px-2 py-1.5">
+                          {archiviata ? (
+                            <span className="block text-right tabular-nums text-muted-foreground">
+                              {formatOrDash(getRawCellValue(valori, voce.id, lastMese))}
+                            </span>
+                          ) : (
+                            <InlineCell
+                              voceId={voce.id}
+                              mese={lastMese}
+                              valori={valori}
+                              onSave={onCellSave}
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
               </tr>
             );
           })}
@@ -301,6 +464,8 @@ function VoceTable({
     </div>
   );
 }
+
+// --- Screen ---
 
 interface DialogState {
   open: boolean;
@@ -317,6 +482,7 @@ export default function PatrimonioPanoramicaScreen() {
     voci,
     gruppi,
     valori,
+    kpi,
     mostraArchiviate,
     fetchVoci,
     addVoce,
@@ -324,6 +490,8 @@ export default function PatrimonioPanoramicaScreen() {
     archiveVoce,
     restoreVoce,
     reorderVoce,
+    upsertValore,
+    deleteValore,
     toggleMostraArchiviate,
   } = usePatrimonioStore();
 
@@ -358,6 +526,14 @@ export default function PatrimonioPanoramicaScreen() {
     }
   }
 
+  async function handleCellSave(voceId: number, mese: number, value: number | null) {
+    if (value === null) {
+      await deleteValore(voceId, mese);
+    } else {
+      await upsertValore(voceId, mese, value);
+    }
+  }
+
   return (
     <>
       <VoceDialog
@@ -371,6 +547,8 @@ export default function PatrimonioPanoramicaScreen() {
       />
 
       <div className="space-y-6">
+        {kpi && <PatrimonioKpiRow kpi={kpi} />}
+
         <div className="flex items-center justify-between">
           <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
             <input
@@ -408,6 +586,7 @@ export default function PatrimonioPanoramicaScreen() {
             onArchive={archiveVoce}
             onRestore={restoreVoce}
             onReorder={reorderVoce}
+            onCellSave={handleCellSave}
           />
         </section>
 
@@ -436,6 +615,7 @@ export default function PatrimonioPanoramicaScreen() {
             onArchive={archiveVoce}
             onRestore={restoreVoce}
             onReorder={reorderVoce}
+            onCellSave={handleCellSave}
           />
         </section>
       </div>

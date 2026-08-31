@@ -245,6 +245,21 @@ export function setGranularita(db: Database.Database, valore: Granularita): void
   }
 }
 
+const QUARTER_END_MONTHS = [3, 6, 9, 12];
+
+export function countValoriNascosti(db: Database.Database, anno: number, nuovaGranularita: Granularita): number {
+  try {
+    if (nuovaGranularita === 'mese') return 0;
+    const placeholders = QUARTER_END_MONTHS.map(() => '?').join(',');
+    const row = db
+      .prepare(`SELECT COUNT(*) as cnt FROM patrimonio_valori WHERE anno = ? AND mese NOT IN (${placeholders})`)
+      .get(anno, ...QUARTER_END_MONTHS) as { cnt: number };
+    return row.cnt;
+  } catch (err) {
+    throw new Error(`Failed to count valori nascosti anno=${anno}: ${String(err)}`);
+  }
+}
+
 // --- Helpers ---
 
 export function findOrCreateGruppo(

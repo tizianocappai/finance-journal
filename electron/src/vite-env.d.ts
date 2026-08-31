@@ -22,6 +22,7 @@ import type {
   PatrimonioGruppo,
   PatrimonioVoce,
   PatrimonioValore,
+  KpiPatrimonio,
 } from './ipc/types';
 import type { PreviewResult, ExecuteResult } from './ipc/import_csv';
 
@@ -90,6 +91,10 @@ declare global {
         archiveVoce: (id: number) => Promise<void>;
         restoreVoce: (id: number) => Promise<void>;
         listValori: (anno: number) => Promise<PatrimonioValore[]>;
+        upsertValore: (voceId: number, anno: number, mese: number, importo: number) => Promise<PatrimonioValore>;
+        deleteValore: (voceId: number, anno: number, mese: number) => Promise<void>;
+        getKpi: (anno: number) => Promise<KpiPatrimonio>;
+        countValoriNascosti: (anno: number, nuovaGranularita: Granularita) => Promise<number>;
       };
     };
   }

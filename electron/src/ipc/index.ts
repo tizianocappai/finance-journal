@@ -43,6 +43,10 @@ import {
   archiveVoce,
   restoreVoce,
   listValoriPerAnno,
+  upsertValore,
+  deleteValore,
+  getKpiPatrimonio,
+  countValoriNascosti,
   listGruppi,
   findOrCreateGruppo,
 } from './patrimonio';
@@ -308,4 +312,41 @@ export function registerPatrimonioHandlers(
       throw new Error(`patrimonio:list-valori failed: ${String(err)}`);
     }
   });
+  ipcMain.handle(
+    'patrimonio:upsert-valore',
+    (_e, { voceId, anno, mese, importo }: { voceId: number; anno: number; mese: number; importo: number }) => {
+      try {
+        return upsertValore(db, voceId, anno, mese, importo);
+      } catch (err) {
+        throw new Error(`patrimonio:upsert-valore failed: ${String(err)}`);
+      }
+    },
+  );
+  ipcMain.handle(
+    'patrimonio:delete-valore',
+    (_e, { voceId, anno, mese }: { voceId: number; anno: number; mese: number }) => {
+      try {
+        return deleteValore(db, voceId, anno, mese);
+      } catch (err) {
+        throw new Error(`patrimonio:delete-valore failed: ${String(err)}`);
+      }
+    },
+  );
+  ipcMain.handle('patrimonio:get-kpi', (_e, { anno }: { anno: number }) => {
+    try {
+      return getKpiPatrimonio(db, anno);
+    } catch (err) {
+      throw new Error(`patrimonio:get-kpi failed: ${String(err)}`);
+    }
+  });
+  ipcMain.handle(
+    'patrimonio:count-valori-nascosti',
+    (_e, { anno, nuovaGranularita }: { anno: number; nuovaGranularita: Granularita }) => {
+      try {
+        return countValoriNascosti(db, anno, nuovaGranularita);
+      } catch (err) {
+        throw new Error(`patrimonio:count-valori-nascosti failed: ${String(err)}`);
+      }
+    },
+  );
 }
