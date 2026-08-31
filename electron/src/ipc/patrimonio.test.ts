@@ -238,17 +238,32 @@ describe('getKpiPatrimonio', () => {
     expect(kpi.patrimonioNetto).toBe(0);
   });
 
-  it('somma correttamente attivi e passivi', () => {
+  it('prende il valore più recente per voce, non la somma di tutti i mesi', () => {
     const vAttivo = createVoce(db, 'Conto', 'attivo');
     const vPassivo = createVoce(db, 'Mutuo', 'passivo');
+    // Conto: Gen=10000 e Feb=11000 → più recente = Feb = 11000
     upsertValore(db, vAttivo.id, 2024, 1, 10000);
     upsertValore(db, vAttivo.id, 2024, 2, 11000);
+    // Mutuo: solo Gen=5000
     upsertValore(db, vPassivo.id, 2024, 1, 5000);
 
     const kpi = getKpiPatrimonio(db, 2024);
-    expect(kpi.totaleAttivi).toBe(21000);
+    expect(kpi.totaleAttivi).toBe(11000);   // non 21000 (10000+11000)
     expect(kpi.totalePassivi).toBe(5000);
-    expect(kpi.patrimonioNetto).toBe(16000);
+    expect(kpi.patrimonioNetto).toBe(6000); // non 16000
+  });
+
+  it('somma più voci attive con valori in mesi diversi', () => {
+    const v1 = createVoce(db, 'Conto', 'attivo');
+    const v2 = createVoce(db, 'BTP', 'attivo');
+    // v1: ultimo valore = Mar = 1000
+    upsertValore(db, v1.id, 2024, 1, 500);
+    upsertValore(db, v1.id, 2024, 3, 1000);
+    // v2: ultimo valore = Gen = 2000
+    upsertValore(db, v2.id, 2024, 1, 2000);
+
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.totaleAttivi).toBe(3000); // 1000 + 2000, non 500+1000+2000=3500
   });
 
   it('celle NULL (non inserite) non vengono conteggiate', () => {

@@ -202,15 +202,24 @@ export function listValoriPerAnno(
 
 export function getKpiPatrimonio(db: Database.Database, anno: number): KpiPatrimonio {
   try {
+    // Per ogni voce prende solo il valore del mese più recente disponibile,
+    // poi somma questi per tipo. Non somma tutti i mesi per voce.
     const rows = db
       .prepare(
         `SELECT pv.tipo, SUM(val.importo) as totale
          FROM patrimonio_valori val
+         INNER JOIN (
+           SELECT voce_id, MAX(mese) AS max_mese
+           FROM patrimonio_valori
+           WHERE anno = ?
+           GROUP BY voce_id
+         ) newest ON val.voce_id = newest.voce_id
+                  AND val.mese = newest.max_mese
+                  AND val.anno = ?
          JOIN patrimonio_voci pv ON pv.id = val.voce_id
-         WHERE val.anno = ?
          GROUP BY pv.tipo`,
       )
-      .all(anno) as Array<{ tipo: string; totale: number }>;
+      .all(anno, anno) as Array<{ tipo: string; totale: number }>;
 
     const totaleAttivi = rows.find((r) => r.tipo === 'attivo')?.totale ?? 0;
     const totalePassivi = rows.find((r) => r.tipo === 'passivo')?.totale ?? 0;
