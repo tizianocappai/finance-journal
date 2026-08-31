@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts, PatrimonioVoce, PatrimonioValore, PatrimonioGruppo, KpiPatrimonio } from './ipc/types';
+import type { Granularita, Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts, PatrimonioVoce, PatrimonioValore, PatrimonioGruppo, KpiPatrimonio, PatrimonioStorico } from './ipc/types';
 
 
 try {
@@ -113,6 +113,8 @@ try {
         ipcRenderer.invoke('patrimonio:get-kpi', { anno }) as Promise<KpiPatrimonio>,
       countValoriNascosti: (anno: number, nuovaGranularita: Granularita) =>
         ipcRenderer.invoke('patrimonio:count-valori-nascosti', { anno, nuovaGranularita }) as Promise<number>,
+      getStorico: () =>
+        ipcRenderer.invoke('patrimonio:get-storico') as Promise<PatrimonioStorico>,
     },
   });
 } catch (err) {

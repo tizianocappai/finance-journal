@@ -23,6 +23,7 @@ import type {
   PatrimonioVoce,
   PatrimonioValore,
   KpiPatrimonio,
+  PatrimonioStorico,
 } from './ipc/types';
 import type { PreviewResult, ExecuteResult } from './ipc/import_csv';
 
@@ -98,6 +99,7 @@ declare global {
         deleteValore: (voceId: number, anno: number, mese: number) => Promise<void>;
         getKpi: (anno: number) => Promise<KpiPatrimonio>;
         countValoriNascosti: (anno: number, nuovaGranularita: Granularita) => Promise<number>;
+        getStorico: () => Promise<PatrimonioStorico>;
       };
     };
   }

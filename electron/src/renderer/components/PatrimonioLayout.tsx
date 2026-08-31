@@ -7,6 +7,7 @@ import type { Granularita } from '../../ipc/types';
 
 const TABS = [
   { label: 'Panoramica', to: '/patrimonio/panoramica' },
+  { label: 'Analisi', to: '/patrimonio/analisi' },
 ] as const;
 
 const GRANULARITA_OPTIONS: { label: string; value: Granularita }[] = [

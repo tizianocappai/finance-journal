@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Granularita, KpiPatrimonio, PatrimonioGruppo, PatrimonioValore, PatrimonioVoce } from '../../ipc/types';
+import type { Granularita, KpiPatrimonio, PatrimonioGruppo, PatrimonioStorico, PatrimonioValore, PatrimonioVoce } from '../../ipc/types';
 
 interface PatrimonioState {
   anno: number;
@@ -8,11 +8,13 @@ interface PatrimonioState {
   gruppi: PatrimonioGruppo[];
   valori: PatrimonioValore[];
   kpi: KpiPatrimonio | null;
+  storico: PatrimonioStorico;
   mostraArchiviate: boolean;
   setAnno: (anno: number) => void;
   setGranularita: (granularita: Granularita) => Promise<void>;
   loadGranularita: () => Promise<void>;
   fetchVoci: (anno: number) => Promise<void>;
+  fetchStorico: () => Promise<void>;
   upsertValore: (voceId: number, mese: number, importo: number) => Promise<void>;
   deleteValore: (voceId: number, mese: number) => Promise<void>;
   countValoriNascosti: (nuovaGranularita: Granularita) => Promise<number>;
@@ -48,9 +50,19 @@ export const usePatrimonioStore = create<PatrimonioState>()((set, get) => ({
   gruppi: [],
   valori: [],
   kpi: null,
+  storico: [],
   mostraArchiviate: false,
 
   setAnno: (anno) => set({ anno }),
+
+  fetchStorico: async () => {
+    try {
+      const storico = await window.electronAPI.patrimonio.getStorico();
+      set({ storico });
+    } catch (err) {
+      console.error('Failed to fetch storico:', err);
+    }
+  },
 
   setGranularita: async (granularita) => {
     set({ granularita });

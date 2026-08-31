@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { getImpostazione, setImpostazione } from './impostazioni';
-import type { Granularita, KpiPatrimonio, PatrimonioGruppo, PatrimonioValore, PatrimonioVoce } from './types';
+import type { Granularita, KpiPatrimonio, PatrimonioGruppo, PatrimonioStorico, PatrimonioValore, PatrimonioVoce } from './types';
 
 // --- Gruppi ---
 
@@ -221,36 +221,115 @@ export function listValoriPerAnno(
 
 // --- KPI ---
 
+function queryKpiTotals(db: Database.Database, anno: number): { totaleAttivi: number; totalePassivi: number } {
+  const rows = db
+    .prepare(
+      `SELECT pv.tipo, SUM(val.importo) as totale
+       FROM patrimonio_valori val
+       INNER JOIN (
+         SELECT voce_id, MAX(mese) AS max_mese
+         FROM patrimonio_valori
+         WHERE anno = ?
+         GROUP BY voce_id
+       ) newest ON val.voce_id = newest.voce_id
+                AND val.mese = newest.max_mese
+                AND val.anno = ?
+       JOIN patrimonio_voci pv ON pv.id = val.voce_id
+       GROUP BY pv.tipo`,
+    )
+    .all(anno, anno) as Array<{ tipo: string; totale: number }>;
+
+  return {
+    totaleAttivi: rows.find((r) => r.tipo === 'attivo')?.totale ?? 0,
+    totalePassivi: rows.find((r) => r.tipo === 'passivo')?.totale ?? 0,
+  };
+}
+
+function hasDataForAnno(db: Database.Database, anno: number): boolean {
+  const row = db
+    .prepare('SELECT COUNT(*) as cnt FROM patrimonio_valori WHERE anno = ?')
+    .get(anno) as { cnt: number };
+  return row.cnt > 0;
+}
+
+function computeYoY(current: number, previous: number): { assoluto: number; percentuale: number } | null {
+  if (previous === 0) return null;
+  const assoluto = current - previous;
+  const percentuale = (assoluto / Math.abs(previous)) * 100;
+  return { assoluto, percentuale };
+}
+
 export function getKpiPatrimonio(db: Database.Database, anno: number): KpiPatrimonio {
   try {
-    // Per ogni voce prende solo il valore del mese più recente disponibile,
-    // poi somma questi per tipo. Non somma tutti i mesi per voce.
-    const rows = db
-      .prepare(
-        `SELECT pv.tipo, SUM(val.importo) as totale
-         FROM patrimonio_valori val
-         INNER JOIN (
-           SELECT voce_id, MAX(mese) AS max_mese
-           FROM patrimonio_valori
-           WHERE anno = ?
-           GROUP BY voce_id
-         ) newest ON val.voce_id = newest.voce_id
-                  AND val.mese = newest.max_mese
-                  AND val.anno = ?
-         JOIN patrimonio_voci pv ON pv.id = val.voce_id
-         GROUP BY pv.tipo`,
-      )
-      .all(anno, anno) as Array<{ tipo: string; totale: number }>;
+    const { totaleAttivi, totalePassivi } = queryKpiTotals(db, anno);
+    const patrimonioNetto = totaleAttivi - totalePassivi;
 
-    const totaleAttivi = rows.find((r) => r.tipo === 'attivo')?.totale ?? 0;
-    const totalePassivi = rows.find((r) => r.tipo === 'passivo')?.totale ?? 0;
+    const annoPrecedente = anno - 1;
+    const hasPrevious = hasDataForAnno(db, annoPrecedente);
+
+    if (!hasPrevious) {
+      return {
+        totaleAttivi,
+        totalePassivi,
+        patrimonioNetto,
+        deltaAttiviYoY: null,
+        deltaPassiviYoY: null,
+        deltaNettoYoY: null,
+      };
+    }
+
+    const prev = queryKpiTotals(db, annoPrecedente);
+    const prevNetto = prev.totaleAttivi - prev.totalePassivi;
+
     return {
       totaleAttivi,
       totalePassivi,
-      patrimonioNetto: totaleAttivi - totalePassivi,
+      patrimonioNetto,
+      deltaAttiviYoY: computeYoY(totaleAttivi, prev.totaleAttivi),
+      deltaPassiviYoY: computeYoY(totalePassivi, prev.totalePassivi),
+      deltaNettoYoY: computeYoY(patrimonioNetto, prevNetto),
     };
   } catch (err) {
     throw new Error(`Failed to get KPI patrimonio anno=${anno}: ${String(err)}`);
+  }
+}
+
+export function getStorico(db: Database.Database): PatrimonioStorico {
+  try {
+    const rows = db
+      .prepare(
+        `SELECT pv.anno, pvc.tipo, SUM(pv.importo) as totale
+         FROM patrimonio_valori pv
+         JOIN patrimonio_voci pvc ON pvc.id = pv.voce_id
+         WHERE pv.mese = 12
+         GROUP BY pv.anno, pvc.tipo
+         ORDER BY pv.anno`,
+      )
+      .all() as Array<{ anno: number; tipo: string; totale: number }>;
+
+    const byAnno = new Map<number, { attivi: number; passivi: number }>();
+    for (const row of rows) {
+      if (!byAnno.has(row.anno)) byAnno.set(row.anno, { attivi: 0, passivi: 0 });
+      const entry = byAnno.get(row.anno)!;
+      if (row.tipo === 'attivo') entry.attivi = row.totale;
+      else entry.passivi = row.totale;
+    }
+
+    const anniConValori = db
+      .prepare('SELECT DISTINCT anno FROM patrimonio_valori ORDER BY anno')
+      .all() as Array<{ anno: number }>;
+
+    return anniConValori.map(({ anno }) => {
+      const entry = byAnno.get(anno) ?? { attivi: 0, passivi: 0 };
+      return {
+        anno,
+        totaleAttivi: entry.attivi,
+        totalePassivi: entry.passivi,
+        patrimonioNetto: entry.attivi - entry.passivi,
+      };
+    });
+  } catch (err) {
+    throw new Error(`Failed to get storico patrimonio: ${String(err)}`);
   }
 }
 

@@ -46,6 +46,7 @@ import {
   upsertValore,
   deleteValore,
   getKpiPatrimonio,
+  getStorico,
   countValoriNascosti,
   listGruppi,
   createGruppo,
@@ -379,4 +380,11 @@ export function registerPatrimonioHandlers(
       }
     },
   );
+  ipcMain.handle('patrimonio:get-storico', () => {
+    try {
+      return getStorico(db);
+    } catch (err) {
+      throw new Error(`patrimonio:get-storico failed: ${String(err)}`);
+    }
+  });
 }

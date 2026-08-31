@@ -10,6 +10,7 @@ import MovimentiScreen from '@/components/screens/MovimentiScreen';
 import ImpostazioniScreen from '@/components/screens/ImpostazioniScreen';
 import ResocontoImpostazioniScreen from '@/components/screens/ResocontoImpostazioniScreen';
 import PatrimonioPanoramicaScreen from '@/components/screens/PatrimonioPanoramicaScreen';
+import PatrimonioAnalisiScreen from '@/components/screens/PatrimonioAnalisiScreen';
 import Toast from '@/components/Toast';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="/patrimonio" element={<PatrimonioLayout />}>
               <Route index element={<Navigate to="panoramica" replace />} />
               <Route path="panoramica" element={<PatrimonioPanoramicaScreen />} />
+              <Route path="analisi" element={<PatrimonioAnalisiScreen />} />
             </Route>
             <Route path="/impostazioni" element={<ImpostazioniScreen />} />
             <Route path="*" element={<Navigate to="/resoconto/dashboard" replace />} />

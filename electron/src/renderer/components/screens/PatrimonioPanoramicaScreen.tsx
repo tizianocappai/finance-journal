@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { ChevronUp, ChevronDown, Plus, X, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePatrimonioStore } from '@/stores/patrimonio';
-import type { KpiPatrimonio, PatrimonioGruppo, PatrimonioVoce, PatrimonioValore } from '../../../ipc/types';
+import type { KpiPatrimonio, KpiPatrimonioYoY, PatrimonioGruppo, PatrimonioVoce, PatrimonioValore } from '../../../ipc/types';
 
 const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -33,19 +33,41 @@ function formatOrDash(raw: number | null): string {
 
 // --- KPI ---
 
+function formatDelta(delta: KpiPatrimonioYoY): string {
+  const isPositive = delta.assoluto >= 0;
+  const sign = isPositive ? '+' : '−';
+  const absImporto = formatImporto(Math.abs(delta.assoluto));
+  const absPct = Math.abs(delta.percentuale).toFixed(1);
+  return `${sign}€${absImporto} (${sign}${absPct}%)`;
+}
+
 interface KpiTileProps {
   label: string;
   value: number;
   colorCls?: string;
+  delta?: KpiPatrimonioYoY | null;
 }
 
-function KpiTile({ label, value, colorCls }: KpiTileProps) {
+function KpiTile({ label, value, colorCls, delta }: KpiTileProps) {
+  const isPositive = delta != null && delta.assoluto >= 0;
+  const deltaCls = isPositive
+    ? 'text-green-600 dark:text-green-400'
+    : 'text-red-600 dark:text-red-400';
+  const deltaArrow = isPositive ? '▲' : '▼';
+
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <span className={cn('text-2xl font-semibold tabular-nums', colorCls ?? 'text-foreground')}>
         {formatImporto(value)}
       </span>
+      {delta != null ? (
+        <span className={cn('text-xs tabular-nums', deltaCls)} aria-label={`Variazione anno precedente: ${formatDelta(delta)}`}>
+          {deltaArrow} {formatDelta(delta)}
+        </span>
+      ) : (
+        <span className="text-xs text-muted-foreground" aria-label="Nessun dato anno precedente">—</span>
+      )}
     </div>
   );
 }
@@ -58,9 +80,9 @@ function PatrimonioKpiRow({ kpi }: { kpi: KpiPatrimonio }) {
 
   return (
     <div className="grid grid-cols-3 gap-4" aria-label="KPI patrimonio">
-      <KpiTile label="Totale Attivi" value={kpi.totaleAttivi} colorCls="text-green-600 dark:text-green-400" />
-      <KpiTile label="Totale Passivi" value={kpi.totalePassivi} colorCls="text-red-600 dark:text-red-400" />
-      <KpiTile label="Patrimonio Netto" value={kpi.patrimonioNetto} colorCls={nettoColor} />
+      <KpiTile label="Totale Attivi" value={kpi.totaleAttivi} colorCls="text-green-600 dark:text-green-400" delta={kpi.deltaAttiviYoY} />
+      <KpiTile label="Totale Passivi" value={kpi.totalePassivi} colorCls="text-red-600 dark:text-red-400" delta={kpi.deltaPassiviYoY} />
+      <KpiTile label="Patrimonio Netto" value={kpi.patrimonioNetto} colorCls={nettoColor} delta={kpi.deltaNettoYoY} />
     </div>
   );
 }

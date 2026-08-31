@@ -178,8 +178,23 @@ export interface PatrimonioValore {
   importo: number;
 }
 
+export interface KpiPatrimonioYoY {
+  assoluto: number;
+  percentuale: number;
+}
+
 export interface KpiPatrimonio {
   totaleAttivi: number;
   totalePassivi: number;
   patrimonioNetto: number;
+  deltaAttiviYoY: KpiPatrimonioYoY | null;
+  deltaPassiviYoY: KpiPatrimonioYoY | null;
+  deltaNettoYoY: KpiPatrimonioYoY | null;
 }
+
+export type PatrimonioStorico = Array<{
+  anno: number;
+  totaleAttivi: number;
+  totalePassivi: number;
+  patrimonioNetto: number;
+}>;
