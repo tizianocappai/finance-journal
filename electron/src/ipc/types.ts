@@ -149,3 +149,34 @@ export interface TrendMensile {
   corrente: number[];
   precedente: number[];
 }
+
+export interface PatrimonioGruppo {
+  id: number;
+  nome: string;
+  tipo: 'attivo' | 'passivo';
+  ordine: number;
+}
+
+export interface PatrimonioVoce {
+  id: number;
+  nome: string;
+  tipo: 'attivo' | 'passivo';
+  gruppo_id: number | null;
+  attiva: number;
+  ordine: number;
+  created_at: string;
+}
+
+export interface PatrimonioValore {
+  id: number;
+  voce_id: number;
+  anno: number;
+  mese: number;
+  importo: number;
+}
+
+export interface KpiPatrimonio {
+  totaleAttivi: number;
+  totalePassivi: number;
+  patrimonioNetto: number;
+}

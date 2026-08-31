@@ -94,6 +94,45 @@ function migrateToV3(db: Database.Database): void {
   })();
 }
 
+// Migration v4: crea tabelle patrimonio_gruppi, patrimonio_voci, patrimonio_valori
+function migrateToV4(db: Database.Database): void {
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS patrimonio_gruppi (
+          id     INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome   TEXT    NOT NULL,
+          tipo   TEXT    NOT NULL CHECK (tipo IN ('attivo', 'passivo')),
+          ordine INTEGER NOT NULL DEFAULT 0,
+          UNIQUE (nome, tipo)
+        );
+
+        CREATE TABLE IF NOT EXISTS patrimonio_voci (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome       TEXT    NOT NULL,
+          tipo       TEXT    NOT NULL CHECK (tipo IN ('attivo', 'passivo')),
+          gruppo_id  INTEGER REFERENCES patrimonio_gruppi(id) ON DELETE SET NULL,
+          attiva     INTEGER NOT NULL DEFAULT 1,
+          ordine     INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS patrimonio_valori (
+          id      INTEGER PRIMARY KEY AUTOINCREMENT,
+          voce_id INTEGER NOT NULL REFERENCES patrimonio_voci(id) ON DELETE CASCADE,
+          anno    INTEGER NOT NULL,
+          mese    INTEGER NOT NULL CHECK (mese BETWEEN 1 AND 12),
+          importo REAL    NOT NULL,
+          UNIQUE (voce_id, anno, mese)
+        );
+      `);
+      db.pragma('user_version = 4');
+    })();
+  } catch (err) {
+    throw new Error(`Failed to apply migration v4: ${String(err)}`);
+  }
+}
+
 // Migration v1: aggiunge predefinita/predefinito, riscrive dettagli come lookup, aggiunge dettaglio_id a movimenti
 function migrateToV1(db: Database.Database): void {
   db.transaction(() => {
@@ -230,6 +269,9 @@ export function initDatabase(dbPath?: string): Database.Database {
     }
     if (version < 3) {
       migrateToV3(db);
+    }
+    if (version < 4) {
+      migrateToV4(db);
     }
   } catch (err) {
     db.close();

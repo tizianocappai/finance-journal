@@ -1,0 +1,311 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { initDatabase } from '../db/index';
+import type Database from 'better-sqlite3';
+import {
+  listGruppi,
+  createGruppo,
+  updateGruppo,
+  deleteGruppo,
+  listVoci,
+  createVoce,
+  updateVoce,
+  archiveVoce,
+  restoreVoce,
+  upsertValore,
+  deleteValore,
+  listValoriPerAnno,
+  getKpiPatrimonio,
+  getGranularita,
+  setGranularita,
+} from './patrimonio';
+
+let db: Database.Database;
+
+beforeEach(() => {
+  db = initDatabase(':memory:');
+});
+
+afterEach(() => {
+  db.close();
+});
+
+describe('listGruppi', () => {
+  it('restituisce lista vuota se nessun gruppo', () => {
+    expect(listGruppi(db)).toEqual([]);
+  });
+
+  it('restituisce i gruppi creati', () => {
+    createGruppo(db, 'Liquidità', 'attivo');
+    createGruppo(db, 'Mutui', 'passivo');
+    const list = listGruppi(db);
+    expect(list).toHaveLength(2);
+  });
+});
+
+describe('createGruppo', () => {
+  it('crea un gruppo e lo restituisce', () => {
+    const g = createGruppo(db, 'Liquidità', 'attivo');
+    expect(g.nome).toBe('Liquidità');
+    expect(g.tipo).toBe('attivo');
+    expect(g.id).toBeTypeOf('number');
+  });
+
+  it('lancia errore se nome+tipo duplicato', () => {
+    createGruppo(db, 'Liquidità', 'attivo');
+    expect(() => createGruppo(db, 'Liquidità', 'attivo')).toThrow();
+  });
+
+  it('stesso nome con tipo diverso è permesso', () => {
+    createGruppo(db, 'Investimenti', 'attivo');
+    expect(() => createGruppo(db, 'Investimenti', 'passivo')).not.toThrow();
+  });
+});
+
+describe('updateGruppo', () => {
+  it('rinomina il gruppo', () => {
+    const g = createGruppo(db, 'Vecchio', 'attivo');
+    const updated = updateGruppo(db, g.id, 'Nuovo');
+    expect(updated.nome).toBe('Nuovo');
+    expect(updated.tipo).toBe('attivo');
+  });
+
+  it('lancia errore se id non esiste', () => {
+    expect(() => updateGruppo(db, 9999, 'X')).toThrow(/non trovato/i);
+  });
+});
+
+describe('deleteGruppo', () => {
+  it('elimina il gruppo', () => {
+    const g = createGruppo(db, 'Liquidità', 'attivo');
+    deleteGruppo(db, g.id);
+    expect(listGruppi(db)).toHaveLength(0);
+  });
+
+  it('lancia errore se id non esiste', () => {
+    expect(() => deleteGruppo(db, 9999)).toThrow(/non trovato/i);
+  });
+
+  it('ON DELETE SET NULL: delete gruppo → voci diventano ungrouped (gruppo_id = NULL)', () => {
+    const g = createGruppo(db, 'Liquidità', 'attivo');
+    const v = createVoce(db, 'Conto corrente', 'attivo', g.id);
+    deleteGruppo(db, g.id);
+    const voci = listVoci(db);
+    const voceAggiornata = voci.find((x) => x.id === v.id);
+    expect(voceAggiornata?.gruppo_id).toBeNull();
+  });
+});
+
+describe('listVoci', () => {
+  it('restituisce solo voci attive per default', () => {
+    const v1 = createVoce(db, 'Conto', 'attivo');
+    const v2 = createVoce(db, 'Fondo', 'attivo');
+    archiveVoce(db, v2.id);
+    const list = listVoci(db);
+    expect(list.map((v) => v.id)).toContain(v1.id);
+    expect(list.map((v) => v.id)).not.toContain(v2.id);
+  });
+
+  it('con soloAttive=false restituisce tutte le voci', () => {
+    const v1 = createVoce(db, 'Conto', 'attivo');
+    const v2 = createVoce(db, 'Fondo', 'attivo');
+    archiveVoce(db, v2.id);
+    const list = listVoci(db, false);
+    expect(list.map((v) => v.id)).toContain(v1.id);
+    expect(list.map((v) => v.id)).toContain(v2.id);
+  });
+});
+
+describe('createVoce', () => {
+  it('crea una voce con attiva=1 di default', () => {
+    const v = createVoce(db, 'Conto corrente', 'attivo');
+    expect(v.nome).toBe('Conto corrente');
+    expect(v.tipo).toBe('attivo');
+    expect(v.attiva).toBe(1);
+    expect(v.gruppo_id).toBeNull();
+  });
+
+  it('crea una voce con gruppo_id', () => {
+    const g = createGruppo(db, 'Liquidità', 'attivo');
+    const v = createVoce(db, 'Conto corrente', 'attivo', g.id);
+    expect(v.gruppo_id).toBe(g.id);
+  });
+});
+
+describe('updateVoce', () => {
+  it('aggiorna nome e gruppo_id', () => {
+    const g = createGruppo(db, 'Liquidità', 'attivo');
+    const v = createVoce(db, 'Conto', 'attivo');
+    const updated = updateVoce(db, v.id, { nome: 'Conto corrente', gruppo_id: g.id });
+    expect(updated.nome).toBe('Conto corrente');
+    expect(updated.gruppo_id).toBe(g.id);
+  });
+
+  it('lancia errore se id non esiste', () => {
+    expect(() => updateVoce(db, 9999, { nome: 'X' })).toThrow(/non trovata/i);
+  });
+});
+
+describe('archiveVoce / restoreVoce', () => {
+  it('archiveVoce imposta attiva=0', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    archiveVoce(db, v.id);
+    const all = listVoci(db, false);
+    expect(all.find((x) => x.id === v.id)?.attiva).toBe(0);
+  });
+
+  it('restoreVoce imposta attiva=1', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    archiveVoce(db, v.id);
+    restoreVoce(db, v.id);
+    const all = listVoci(db, false);
+    expect(all.find((x) => x.id === v.id)?.attiva).toBe(1);
+  });
+
+  it('archiveVoce lancia errore se id non esiste', () => {
+    expect(() => archiveVoce(db, 9999)).toThrow(/non trovata/i);
+  });
+
+  it('restoreVoce lancia errore se id non esiste', () => {
+    expect(() => restoreVoce(db, 9999)).toThrow(/non trovata/i);
+  });
+});
+
+describe('upsertValore', () => {
+  it('inserisce un valore e lo restituisce', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    const val = upsertValore(db, v.id, 2024, 1, 1000);
+    expect(val.voce_id).toBe(v.id);
+    expect(val.anno).toBe(2024);
+    expect(val.mese).toBe(1);
+    expect(val.importo).toBe(1000);
+  });
+
+  it('upsert sovrascrive il valore esistente per stessa (voce_id, anno, mese)', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 1000);
+    upsertValore(db, v.id, 2024, 1, 2000);
+    const valori = listValoriPerAnno(db, 2024);
+    expect(valori).toHaveLength(1);
+    expect(valori[0].importo).toBe(2000);
+  });
+
+  it('inserisce valori per mesi diversi della stessa voce', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 1000);
+    upsertValore(db, v.id, 2024, 2, 1500);
+    expect(listValoriPerAnno(db, 2024)).toHaveLength(2);
+  });
+
+  it('UNIQUE constraint (voce_id, anno, mese): raw INSERT duplicato lancia errore', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    db.prepare('INSERT INTO patrimonio_valori (voce_id, anno, mese, importo) VALUES (?, ?, ?, ?)').run(v.id, 2024, 1, 1000);
+    expect(() =>
+      db.prepare('INSERT INTO patrimonio_valori (voce_id, anno, mese, importo) VALUES (?, ?, ?, ?)').run(v.id, 2024, 1, 2000)
+    ).toThrow();
+  });
+});
+
+describe('deleteValore', () => {
+  it('elimina il valore specificato', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 1000);
+    deleteValore(db, v.id, 2024, 1);
+    expect(listValoriPerAnno(db, 2024)).toHaveLength(0);
+  });
+
+  it('non lancia errore se il valore non esiste', () => {
+    expect(() => deleteValore(db, 9999, 2024, 1)).not.toThrow();
+  });
+});
+
+describe('listValoriPerAnno', () => {
+  it('restituisce solo i valori dell\'anno richiesto', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 1000);
+    upsertValore(db, v.id, 2025, 1, 2000);
+    expect(listValoriPerAnno(db, 2024)).toHaveLength(1);
+    expect(listValoriPerAnno(db, 2025)).toHaveLength(1);
+  });
+});
+
+describe('getKpiPatrimonio', () => {
+  it('restituisce zeri se nessun valore', () => {
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.totaleAttivi).toBe(0);
+    expect(kpi.totalePassivi).toBe(0);
+    expect(kpi.patrimonioNetto).toBe(0);
+  });
+
+  it('somma correttamente attivi e passivi', () => {
+    const vAttivo = createVoce(db, 'Conto', 'attivo');
+    const vPassivo = createVoce(db, 'Mutuo', 'passivo');
+    upsertValore(db, vAttivo.id, 2024, 1, 10000);
+    upsertValore(db, vAttivo.id, 2024, 2, 11000);
+    upsertValore(db, vPassivo.id, 2024, 1, 5000);
+
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.totaleAttivi).toBe(21000);
+    expect(kpi.totalePassivi).toBe(5000);
+    expect(kpi.patrimonioNetto).toBe(16000);
+  });
+
+  it('celle NULL (non inserite) non vengono conteggiate', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    // Solo mese 1 ha valore, mese 2 non ha riga → non viene sommato
+    upsertValore(db, v.id, 2024, 1, 1000);
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.totaleAttivi).toBe(1000);
+  });
+
+  it('celle con importo 0 esplicito vengono conteggiate', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 0);
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.totaleAttivi).toBe(0);
+    // totaleAttivi è 0 ma patrimonioNetto deve comunque essere calcolato
+    expect(kpi.patrimonioNetto).toBe(0);
+  });
+
+  it('non conta valori di altri anni', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2023, 12, 99999);
+    upsertValore(db, v.id, 2024, 1, 500);
+    const kpi = getKpiPatrimonio(db, 2024);
+    expect(kpi.totaleAttivi).toBe(500);
+  });
+});
+
+describe('cascading', () => {
+  it('delete voce → cascade delete suoi valori', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2024, 1, 1000);
+    upsertValore(db, v.id, 2024, 2, 2000);
+    db.prepare('DELETE FROM patrimonio_voci WHERE id = ?').run(v.id);
+    expect(listValoriPerAnno(db, 2024)).toHaveLength(0);
+  });
+
+  it('delete gruppo → SET NULL su voci associate', () => {
+    const g = createGruppo(db, 'Liquidità', 'attivo');
+    const v = createVoce(db, 'Conto', 'attivo', g.id);
+    deleteGruppo(db, g.id);
+    const all = listVoci(db);
+    expect(all.find((x) => x.id === v.id)?.gruppo_id).toBeNull();
+  });
+});
+
+describe('getGranularita / setGranularita', () => {
+  it('restituisce "mese" come default se non impostata', () => {
+    expect(getGranularita(db)).toBe('mese');
+  });
+
+  it('setGranularita persiste in impostazioni e getGranularita la rileva', () => {
+    setGranularita(db, 'quarter');
+    expect(getGranularita(db)).toBe('quarter');
+  });
+
+  it('set poi reset a "mese"', () => {
+    setGranularita(db, 'quarter');
+    setGranularita(db, 'mese');
+    expect(getGranularita(db)).toBe('mese');
+  });
+});

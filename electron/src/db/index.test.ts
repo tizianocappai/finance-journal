@@ -11,6 +11,9 @@ const EXPECTED_TABLES = [
   'metodi_pagamento',
   'dettagli',
   'impostazioni',
+  'patrimonio_gruppi',
+  'patrimonio_voci',
+  'patrimonio_valori',
 ];
 
 describe('getDbPath', () => {
