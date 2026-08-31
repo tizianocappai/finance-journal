@@ -12,7 +12,7 @@ Movimento con tipo=Entrata. Contribuisce positivamente al Saldo del periodo.
 Movimento con tipo=Uscita. Contribuisce negativamente al Saldo del periodo.
 
 **Dettaglio**
-Sotto-classificazione operativa di un Movimento. Descrive la natura specifica del Movimento (es. "Supermercato", "Bolletta luce"). Ogni Dettaglio è associato a esattamente una Categoria. Può essere predefinito o custom. Un Movimento ha zero o un Dettaglio (nullable: i Movimenti storici ne sono privi). La Categoria del Movimento è derivata dal Dettaglio associato, ma può essere sovrascritta una tantum per quel singolo Movimento.
+Sotto-classificazione operativa di un Movimento. Descrive la natura specifica del Movimento (es. "Supermercato", "Bolletta luce"). Ogni Dettaglio è associato a esattamente una Categoria. Può essere predefinito o custom. Un Movimento deve avere esattamente un Dettaglio (vincolo UI; la colonna DB resta nullable per compatibilità con i Movimenti storici). La Categoria del Movimento è derivata dal Dettaglio associato, ma può essere sovrascritta una tantum per quel singolo Movimento.
 
 **Categoria**
 Classificazione semantica di un Movimento. È universale: si applica indifferentemente a Entrate e Uscite. Può essere predefinita (parte del set di default) o custom (aggiunta dall'utente). Un Movimento ha esattamente una Categoria. Quando il Movimento ha un Dettaglio, la Categoria è normalmente derivata da esso; può essere sovrascritta one-off senza modificare l'associazione globale Dettaglio→Categoria.

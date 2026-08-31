@@ -8,6 +8,8 @@ import {
   deleteMovimento,
   restoreMovimento,
   deleteAllMovimenti,
+  createMovimentoConDettaglio,
+  updateMovimentoConDettaglio,
 } from './movimenti';
 import type { Movimento } from './types';
 import { listCategorie } from './categorie';
@@ -287,6 +289,113 @@ describe('restoreMovimento', () => {
     const all = listMovimenti(db);
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe(9999);
+  });
+});
+
+describe('createMovimentoConDettaglio', () => {
+  it('crea movimento con dettaglio esistente senza opzioni extra', () => {
+    const { cat } = seed(db);
+    const det = createDettaglio(db, 'Supermercato', cat.id);
+    const mov = createMovimentoConDettaglio(db, {
+      data: '2024-03-15',
+      importo: 50,
+      tipo: 'uscita',
+      dettaglio_id: det.id,
+    });
+    expect(mov.dettaglio_id).toBe(det.id);
+    expect(mov.id).toBeTypeOf('number');
+  });
+
+  it('crea nuovo dettaglio in transazione e lo collega al movimento', () => {
+    const { cat } = seed(db);
+    const mov = createMovimentoConDettaglio(
+      db,
+      { data: '2024-03-15', importo: 30, tipo: 'uscita' },
+      { nuovoDettaglio: { nome: 'NuovoBar', categoria_id: cat.id } },
+    );
+    const det = db.prepare('SELECT * FROM dettagli WHERE nome = ?').get('NuovoBar') as { id: number; categoria_id: number };
+    expect(det).toBeTruthy();
+    expect(mov.dettaglio_id).toBe(det.id);
+    expect(det.categoria_id).toBe(cat.id);
+  });
+
+  it('fa rollback se il nuovo dettaglio ha nome duplicato', () => {
+    const { cat } = seed(db);
+    createDettaglio(db, 'Supermercato', cat.id);
+    expect(() =>
+      createMovimentoConDettaglio(
+        db,
+        { data: '2024-03-15', importo: 30, tipo: 'uscita' },
+        { nuovoDettaglio: { nome: 'Supermercato', categoria_id: cat.id } },
+      ),
+    ).toThrow();
+    expect(listMovimenti(db)).toHaveLength(0);
+  });
+
+  it('aggiorna categoria_id di dettaglio esistente in transazione', () => {
+    const { cat } = seed(db);
+    const det = createDettaglio(db, 'Supermercato');
+    expect(det.categoria_id).toBeNull();
+    const mov = createMovimentoConDettaglio(
+      db,
+      { data: '2024-03-15', importo: 30, tipo: 'uscita', dettaglio_id: det.id },
+      { aggiornaCategoriaDettaglio: { id: det.id, categoria_id: cat.id } },
+    );
+    const updated = db.prepare('SELECT categoria_id FROM dettagli WHERE id = ?').get(det.id) as { categoria_id: number };
+    expect(updated.categoria_id).toBe(cat.id);
+    expect(mov.dettaglio_id).toBe(det.id);
+  });
+});
+
+describe('updateMovimentoConDettaglio', () => {
+  it('aggiorna movimento con dettaglio esistente', () => {
+    const { cat } = seed(db);
+    const det = createDettaglio(db, 'Supermercato', cat.id);
+    const mov = createMovimento(db, { data: '2024-01-01', importo: 10, tipo: 'uscita' });
+    const updated = updateMovimentoConDettaglio(db, mov.id, {
+      data: '2024-06-01',
+      importo: 99,
+      tipo: 'uscita',
+      dettaglio_id: det.id,
+    });
+    expect(updated.dettaglio_id).toBe(det.id);
+    expect(updated.importo).toBe(99);
+  });
+
+  it('crea nuovo dettaglio e lo collega in transazione durante update', () => {
+    const { cat } = seed(db);
+    const mov = createMovimento(db, { data: '2024-01-01', importo: 10, tipo: 'uscita' });
+    const updated = updateMovimentoConDettaglio(
+      db,
+      mov.id,
+      { data: '2024-01-01', importo: 10, tipo: 'uscita' },
+      { nuovoDettaglio: { nome: 'PizzeriaDaLuigi', categoria_id: cat.id } },
+    );
+    const det = db.prepare('SELECT * FROM dettagli WHERE nome = ?').get('PizzeriaDaLuigi') as { id: number };
+    expect(det).toBeTruthy();
+    expect(updated.dettaglio_id).toBe(det.id);
+  });
+
+  it('fa rollback se update dettaglio fallisce', () => {
+    const { cat } = seed(db);
+    createDettaglio(db, 'Duplicato', cat.id);
+    const mov = createMovimento(db, { data: '2024-01-01', importo: 10, tipo: 'uscita' });
+    expect(() =>
+      updateMovimentoConDettaglio(
+        db,
+        mov.id,
+        { data: '2024-01-01', importo: 10, tipo: 'uscita' },
+        { nuovoDettaglio: { nome: 'Duplicato', categoria_id: cat.id } },
+      ),
+    ).toThrow();
+    const movAfter = db.prepare('SELECT importo FROM movimenti WHERE id = ?').get(mov.id) as { importo: number };
+    expect(movAfter.importo).toBe(10);
+  });
+
+  it('lancia errore se il movimento non esiste', () => {
+    expect(() =>
+      updateMovimentoConDettaglio(db, 9999, { data: '2024-01-01', importo: 1, tipo: 'uscita' }),
+    ).toThrow(/non trovato/i);
   });
 });
 

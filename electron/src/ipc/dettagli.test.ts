@@ -8,6 +8,7 @@ import {
   updateDettaglio,
   updateDettaglioCategoria,
   countMovimentiByDettaglio,
+  getDettagliOrdinatiPerFrequenza,
 } from './dettagli';
 import { listCategorie } from './categorie';
 
@@ -145,6 +146,44 @@ describe('countMovimentiByDettaglio', () => {
       `INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-02', 20, 'uscita', ?)`,
     ).run(det.id);
     expect(countMovimentiByDettaglio(db, det.id)).toBe(2);
+  });
+});
+
+describe('getDettagliOrdinatiPerFrequenza', () => {
+  it('restituisce array vuoto se non ci sono dettagli', () => {
+    expect(getDettagliOrdinatiPerFrequenza(db)).toEqual([]);
+  });
+
+  it('include uso_count = 0 per dettagli senza movimenti', () => {
+    createDettaglio(db, 'Supermercato');
+    const result = getDettagliOrdinatiPerFrequenza(db);
+    expect(result).toHaveLength(1);
+    expect(result[0].uso_count).toBe(0);
+  });
+
+  it('ordina per frequenza discendente', () => {
+    const det1 = createDettaglio(db, 'Supermercato');
+    const det2 = createDettaglio(db, 'Bar');
+    const det3 = createDettaglio(db, 'Farmacia');
+    db.prepare(`INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-01', 10, 'uscita', ?)`).run(det1.id);
+    db.prepare(`INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-02', 10, 'uscita', ?)`).run(det1.id);
+    db.prepare(`INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-03', 10, 'uscita', ?)`).run(det1.id);
+    db.prepare(`INSERT INTO movimenti (data, importo, tipo, dettaglio_id) VALUES ('2024-01-04', 10, 'uscita', ?)`).run(det2.id);
+    const result = getDettagliOrdinatiPerFrequenza(db);
+    expect(result[0].id).toBe(det1.id);
+    expect(result[0].uso_count).toBe(3);
+    expect(result[1].id).toBe(det2.id);
+    expect(result[1].uso_count).toBe(1);
+    expect(result[2].id).toBe(det3.id);
+    expect(result[2].uso_count).toBe(0);
+  });
+
+  it('a parità di frequenza ordina per nome', () => {
+    createDettaglio(db, 'Zucchero');
+    createDettaglio(db, 'Acqua');
+    const result = getDettagliOrdinatiPerFrequenza(db);
+    expect(result[0].nome).toBe('Acqua');
+    expect(result[1].nome).toBe('Zucchero');
   });
 });
 

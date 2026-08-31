@@ -5,6 +5,7 @@ import type {
   MovimentoFilters,
   MovimentoCreate,
   MovimentoUpdate,
+  SalvaMovimentoDettaglioOpts,
 } from '../../ipc/types';
 
 interface MovimentiState {
@@ -18,6 +19,8 @@ interface MovimentiState {
   fetch: () => Promise<void>;
   create: (data: MovimentoCreate) => Promise<void>;
   update: (id: number, data: MovimentoUpdate) => Promise<void>;
+  createConDettaglio: (data: MovimentoCreate, opts: SalvaMovimentoDettaglioOpts) => Promise<void>;
+  updateConDettaglio: (id: number, data: MovimentoUpdate, opts: SalvaMovimentoDettaglioOpts) => Promise<void>;
   delete: (id: number) => Promise<void>;
   restore: () => Promise<void>;
   deleteAll: () => Promise<void>;
@@ -63,6 +66,12 @@ export const useMovimentiStore = create<MovimentiState>()((set, get) => {
     create: (data) => mutate(() => window.electronAPI.movimenti.create(data).then(() => undefined)),
 
     update: (id, data) => mutate(() => window.electronAPI.movimenti.update(id, data).then(() => undefined)),
+
+    createConDettaglio: (data, opts) =>
+      mutate(() => window.electronAPI.movimenti.createConDettaglio(data, opts).then(() => undefined)),
+
+    updateConDettaglio: (id, data, opts) =>
+      mutate(() => window.electronAPI.movimenti.updateConDettaglio(id, data, opts).then(() => undefined)),
 
     delete: async (id) => {
       try {

@@ -35,10 +35,20 @@ export interface Movimento {
   updated_at: string;
 }
 
+export interface DettaglioConFrequenza extends Dettaglio {
+  uso_count: number;
+}
+
 export interface MovimentoWithLookup extends Movimento {
   categoria_nome: string | null;
   metodo_nome: string | null;
   dettaglio_nome: string | null;
+  dettaglio_categoria_id: number | null;
+}
+
+export interface SalvaMovimentoDettaglioOpts {
+  nuovoDettaglio?: { nome: string; categoria_id: number };
+  aggiornaCategoriaDettaglio?: { id: number; categoria_id: number };
 }
 
 export interface MovimentoFilters {

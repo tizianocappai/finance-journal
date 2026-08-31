@@ -5,6 +5,7 @@ import type {
   MovimentoFilters,
   MovimentoCreate,
   MovimentoUpdate,
+  SalvaMovimentoDettaglioOpts,
 } from './types';
 
 export function listMovimenti(
@@ -45,9 +46,10 @@ export function listMovimenti(
     const sql = `
       SELECT
         m.*,
-        c.nome  AS categoria_nome,
-        mp.nome AS metodo_nome,
-        d.nome  AS dettaglio_nome
+        c.nome         AS categoria_nome,
+        mp.nome        AS metodo_nome,
+        d.nome         AS dettaglio_nome,
+        d.categoria_id AS dettaglio_categoria_id
       FROM movimenti m
       LEFT JOIN categorie c           ON c.id  = m.categoria_id
       LEFT JOIN metodi_pagamento mp   ON mp.id = m.metodo_id
@@ -185,6 +187,100 @@ export function deleteAllMovimenti(
     return execute();
   } catch (err) {
     throw new Error(`Failed to delete all movimenti: ${String(err)}`);
+  }
+}
+
+function resolveDettaglioId(
+  db: Database.Database,
+  baseId: number | null | undefined,
+  opts: SalvaMovimentoDettaglioOpts,
+): number | null {
+  if (opts.nuovoDettaglio) {
+    const row = db
+      .prepare(
+        `INSERT INTO dettagli (nome, categoria_id, predefinito) VALUES (?, ?, 0) RETURNING id`,
+      )
+      .get(opts.nuovoDettaglio.nome, opts.nuovoDettaglio.categoria_id) as { id: number };
+    return row.id;
+  }
+  if (opts.aggiornaCategoriaDettaglio) {
+    db.prepare(`UPDATE dettagli SET categoria_id = ? WHERE id = ?`).run(
+      opts.aggiornaCategoriaDettaglio.categoria_id,
+      opts.aggiornaCategoriaDettaglio.id,
+    );
+    return opts.aggiornaCategoriaDettaglio.id;
+  }
+  return baseId ?? null;
+}
+
+export function createMovimentoConDettaglio(
+  db: Database.Database,
+  data: MovimentoCreate,
+  opts: SalvaMovimentoDettaglioOpts = {},
+): Movimento {
+  try {
+    return db.transaction(() => {
+      const dettaglio_id = resolveDettaglioId(db, data.dettaglio_id, opts);
+      return db
+        .prepare(
+          `INSERT INTO movimenti (data, importo, tipo, descrizione, categoria_id, metodo_id, dettaglio_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+           RETURNING *`,
+        )
+        .get(
+          data.data,
+          data.importo,
+          data.tipo,
+          data.descrizione ?? null,
+          data.categoria_id ?? null,
+          data.metodo_id ?? null,
+          dettaglio_id,
+        ) as Movimento;
+    })();
+  } catch (err) {
+    if (err instanceof Error) throw err;
+    throw new Error(`Failed to create movimento con dettaglio: ${String(err)}`);
+  }
+}
+
+export function updateMovimentoConDettaglio(
+  db: Database.Database,
+  id: number,
+  data: MovimentoUpdate,
+  opts: SalvaMovimentoDettaglioOpts = {},
+): Movimento {
+  try {
+    return db.transaction(() => {
+      assertMovimentoExists(db, id);
+      const dettaglio_id = resolveDettaglioId(db, data.dettaglio_id, opts);
+      return db
+        .prepare(
+          `UPDATE movimenti
+           SET data         = ?,
+               importo      = ?,
+               tipo         = ?,
+               descrizione  = ?,
+               categoria_id = ?,
+               metodo_id    = ?,
+               dettaglio_id = ?,
+               updated_at   = datetime('now')
+           WHERE id = ?
+           RETURNING *`,
+        )
+        .get(
+          data.data,
+          data.importo,
+          data.tipo,
+          data.descrizione ?? null,
+          data.categoria_id ?? null,
+          data.metodo_id ?? null,
+          dettaglio_id,
+          id,
+        ) as Movimento;
+    })();
+  } catch (err) {
+    if (err instanceof Error) throw err;
+    throw new Error(`Failed to update movimento id=${id} con dettaglio: ${String(err)}`);
   }
 }
 

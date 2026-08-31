@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import type { Categoria, MetodoPagamento, Dettaglio } from '../../ipc/types';
+import type { Categoria, MetodoPagamento, Dettaglio, DettaglioConFrequenza } from '../../ipc/types';
 
 interface LookupState {
   categorie: Categoria[];
   metodi: MetodoPagamento[];
   dettagli: Dettaglio[];
+  dettagliPerFrequenza: DettaglioConFrequenza[];
 
   syncCategorie: () => Promise<void>;
   createCategoria: (nome: string, colore?: string, icona?: string) => Promise<Categoria>;
@@ -16,6 +17,7 @@ interface LookupState {
   deleteMetodo: (id: number) => Promise<void>;
 
   syncDettagli: () => Promise<void>;
+  syncDettagliPerFrequenza: () => Promise<void>;
   createDettaglio: (nome: string, categoria_id?: number) => Promise<void>;
   updateDettaglio: (id: number, nome: string, categoria_id?: number) => Promise<void>;
   deleteDettaglio: (id: number, targetDettaglioId: number) => Promise<void>;
@@ -26,6 +28,7 @@ export const useLookupStore = create<LookupState>()((set, get) => ({
   categorie: [],
   metodi: [],
   dettagli: [],
+  dettagliPerFrequenza: [],
 
   syncCategorie: async () => {
     try {
@@ -110,6 +113,15 @@ export const useLookupStore = create<LookupState>()((set, get) => ({
       set({ dettagli: data });
     } catch (err) {
       console.error('syncDettagli failed:', err);
+    }
+  },
+
+  syncDettagliPerFrequenza: async () => {
+    try {
+      const data = await window.electronAPI.dettagli.listPerFrequenza();
+      set({ dettagliPerFrequenza: data });
+    } catch (err) {
+      console.error('syncDettagliPerFrequenza failed:', err);
     }
   },
 

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { Dettaglio } from './types';
+import type { Dettaglio, DettaglioConFrequenza } from './types';
 
 export function listDettagli(db: Database.Database): Dettaglio[] {
   try {
@@ -8,6 +8,22 @@ export function listDettagli(db: Database.Database): Dettaglio[] {
       .all() as Dettaglio[];
   } catch (err) {
     throw new Error(`Failed to list dettagli: ${String(err)}`);
+  }
+}
+
+export function getDettagliOrdinatiPerFrequenza(db: Database.Database): DettaglioConFrequenza[] {
+  try {
+    return db
+      .prepare(
+        `SELECT d.*, COUNT(m.id) AS uso_count
+         FROM dettagli d
+         LEFT JOIN movimenti m ON m.dettaglio_id = d.id
+         GROUP BY d.id
+         ORDER BY uso_count DESC, d.nome ASC`,
+      )
+      .all() as DettaglioConFrequenza[];
+  } catch (err) {
+    throw new Error(`Failed to list dettagli per frequenza: ${String(err)}`);
   }
 }
 

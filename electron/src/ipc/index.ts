@@ -10,6 +10,7 @@ import {
   updateDettaglio,
   updateDettaglioCategoria,
   countMovimentiByDettaglio,
+  getDettagliOrdinatiPerFrequenza,
 } from './dettagli';
 import {
   listMovimenti,
@@ -18,6 +19,8 @@ import {
   deleteMovimento,
   restoreMovimento,
   deleteAllMovimenti,
+  createMovimentoConDettaglio,
+  updateMovimentoConDettaglio,
 } from './movimenti';
 import {
   getDashboardKPI,
@@ -31,7 +34,7 @@ import {
 import { exportCsv, exportJson, importDb } from './export_import';
 import { previewCsv, executeCsv } from './import_csv';
 import { getImpostazione, setImpostazione } from './impostazioni';
-import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './types';
+import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './types';
 
 export function registerImpostazioniHandlers(
   ipcMain: IpcMain,
@@ -140,6 +143,7 @@ export function registerLookupHandlers(
   );
 
   ipcMain.handle('dettagli:list', () => listDettagli(db));
+  ipcMain.handle('dettagli:list-per-frequenza', () => getDettagliOrdinatiPerFrequenza(db));
   ipcMain.handle('dettagli:create', (_e, { nome, categoria_id }: { nome: string; categoria_id?: number }) =>
     createDettaglio(db, nome, categoria_id),
   );
@@ -164,6 +168,16 @@ export function registerLookupHandlers(
   );
   ipcMain.handle('movimenti:update', (_e, { id, ...data }: { id: number } & MovimentoUpdate) =>
     updateMovimento(db, id, data),
+  );
+  ipcMain.handle(
+    'movimenti:createConDettaglio',
+    (_e, { data, opts }: { data: MovimentoCreate; opts: SalvaMovimentoDettaglioOpts }) =>
+      createMovimentoConDettaglio(db, data, opts),
+  );
+  ipcMain.handle(
+    'movimenti:updateConDettaglio',
+    (_e, { id, data, opts }: { id: number; data: MovimentoUpdate; opts: SalvaMovimentoDettaglioOpts }) =>
+      updateMovimentoConDettaglio(db, id, data, opts),
   );
   ipcMain.handle('movimenti:delete', (_e, { id }: { id: number }) =>
     deleteMovimento(db, id),

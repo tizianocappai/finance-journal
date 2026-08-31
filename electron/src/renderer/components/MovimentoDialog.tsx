@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Trash2, Loader2 } from 'lucide-react';
+import { X, Trash2, Loader2, ChevronDown } from 'lucide-react';
 import { useMovimentiStore } from '@/stores/movimenti';
 import { useLookupStore } from '@/stores/lookup';
 import type { MovimentoWithLookup } from '@/types/movimento';
+import type { DettaglioConFrequenza, SalvaMovimentoDettaglioOpts } from '../../ipc/types';
+import { validate, type DettaglioFormState, type MovimentoFormState } from '../lib/movimentoValidate';
 
 interface Props {
   open: boolean;
@@ -11,15 +13,7 @@ interface Props {
   onClose: () => void;
 }
 
-interface FormState {
-  data: string;
-  tipo: 'entrata' | 'uscita';
-  importo: string;
-  categoria_id: string;
-  dettaglio_id: string;
-  metodo_id: string;
-  nota: string;
-}
+type FormState = MovimentoFormState;
 
 function todayIso(): string {
   return new Date().toISOString().split('T')[0];
@@ -27,26 +21,31 @@ function todayIso(): string {
 
 function initForm(movimento?: MovimentoWithLookup): FormState {
   if (!movimento) {
-    return { data: todayIso(), tipo: 'uscita', importo: '', categoria_id: '', dettaglio_id: '', metodo_id: '', nota: '' };
+    return {
+      data: todayIso(),
+      tipo: 'uscita',
+      importo: '',
+      dettaglio: { mode: 'empty' },
+      categoria_id: '',
+      metodo_id: '',
+      nota: '',
+    };
   }
+  const dettaglio: DettaglioFormState =
+    movimento.dettaglio_id != null
+      ? { mode: 'existing', id: movimento.dettaglio_id, categoria_id: movimento.dettaglio_categoria_id }
+      : { mode: 'empty' };
   return {
     data: movimento.data,
     tipo: movimento.tipo,
     importo: String(movimento.importo),
+    dettaglio,
     categoria_id: movimento.categoria_id != null ? String(movimento.categoria_id) : '',
-    dettaglio_id: movimento.dettaglio_id != null ? String(movimento.dettaglio_id) : '',
     metodo_id: movimento.metodo_id != null ? String(movimento.metodo_id) : '',
     nota: movimento.descrizione ?? '',
   };
 }
 
-function validate(form: FormState): Record<string, string> {
-  const errs: Record<string, string> = {};
-  if (!form.data) errs.data = 'Data obbligatoria';
-  const n = parseFloat(form.importo);
-  if (!form.importo || isNaN(n) || n <= 0) errs.importo = 'Importo deve essere maggiore di zero';
-  return errs;
-}
 
 const FIELD_CLS = 'w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring';
 const LABEL_CLS = 'block text-xs font-medium text-muted-foreground mb-1';
@@ -91,9 +90,144 @@ function InlineCreator({ value, onChange, onAdd, onCancel, adding, placeholder, 
   );
 }
 
+interface DettaglioComboboxProps {
+  dettagli: DettaglioConFrequenza[];
+  value: DettaglioFormState;
+  onChange: (v: DettaglioFormState) => void;
+  error?: string;
+  initialText?: string;
+  inputId?: string;
+}
+
+function textFromValue(value: DettaglioFormState, dettagli: DettaglioConFrequenza[]): string | null {
+  if (value.mode === 'existing') {
+    const det = dettagli.find((d) => d.id === value.id);
+    return det ? det.nome : null; // null = list not loaded yet, don't clear
+  }
+  if (value.mode === 'new') return value.nome;
+  return '';
+}
+
+function DettaglioCombobox({ dettagli, value, onChange, error, initialText, inputId = 'f-dettaglio' }: DettaglioComboboxProps) {
+  const [inputText, setInputText] = useState(initialText ?? '');
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const next = textFromValue(value, dettagli);
+    if (next !== null) setInputText(next);
+    // null means dettagli not loaded yet — preserve current text (avoids race on dialog open)
+  }, [value, dettagli]);
+
+  const filtered = dettagli.filter((d) =>
+    d.nome.toLowerCase().includes(inputText.toLowerCase()),
+  );
+
+  const exactMatch = dettagli.some(
+    (d) => d.nome.toLowerCase() === inputText.trim().toLowerCase(),
+  );
+
+  function handleInputChange(text: string) {
+    setInputText(text);
+    setOpen(true);
+  }
+
+  function handleSelect(det: DettaglioConFrequenza) {
+    onChange({ mode: 'existing', id: det.id, categoria_id: det.categoria_id });
+    setInputText(det.nome);
+    setOpen(false);
+  }
+
+  function handleCreate() {
+    const nome = inputText.trim();
+    if (!nome) return;
+    onChange({ mode: 'new', nome });
+    setOpen(false);
+  }
+
+  function handleBlur() {
+    setTimeout(() => {
+      if (!containerRef.current?.contains(document.activeElement)) {
+        setOpen(false);
+        const next = textFromValue(value, dettagli);
+        setInputText(next ?? '');
+      }
+    }, 150);
+  }
+
+  const showCreate = inputText.trim() !== '' && !exactMatch;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <input
+          id={inputId}
+          type="text"
+          value={inputText}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={() => setOpen(true)}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { setOpen(false); handleBlur(); }
+            if (e.key === 'Enter' && showCreate && filtered.length === 0) { e.preventDefault(); handleCreate(); }
+          }}
+          placeholder="Cerca o crea dettaglio…"
+          className={FIELD_CLS + ' pr-8'}
+          aria-autocomplete="list"
+          aria-expanded={open}
+          role="combobox"
+        />
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+      </div>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute z-50 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-52 overflow-y-auto"
+        >
+          {filtered.length === 0 && !showCreate && (
+            <div className="px-3 py-2 text-sm text-muted-foreground">Nessun dettaglio trovato</div>
+          )}
+          {filtered.map((det) => (
+            <button
+              key={det.id}
+              type="button"
+              role="option"
+              aria-selected={value.mode === 'existing' && value.id === det.id}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(det); }}
+              className={
+                'w-full px-3 py-2 text-sm text-left hover:bg-accent text-foreground' +
+                (value.mode === 'existing' && value.id === det.id ? ' bg-accent/50' : '')
+              }
+            >
+              {det.nome}
+            </button>
+          ))}
+          {showCreate && (
+            <button
+              type="button"
+              role="option"
+              onMouseDown={(e) => { e.preventDefault(); handleCreate(); }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent text-muted-foreground border-t border-border"
+            >
+              Crea &ldquo;{inputText.trim()}&rdquo;
+            </button>
+          )}
+        </div>
+      )}
+
+      {error && <p className={ERROR_CLS}>{error}</p>}
+    </div>
+  );
+}
+
 export default function MovimentoDialog({ open, mode, movimento, onClose }: Props) {
-  const { create, update, delete: deleteMovimento } = useMovimentiStore();
-  const { categorie, metodi, dettagli, syncCategorie, syncMetodi, syncDettagli, createCategoria, createMetodo } = useLookupStore();
+  const { createConDettaglio, updateConDettaglio, delete: deleteMovimento } = useMovimentiStore();
+  const { categorie, metodi, dettagliPerFrequenza, syncCategorie, syncMetodi, syncDettagliPerFrequenza, createCategoria, createMetodo } = useLookupStore();
 
   const [form, setForm] = useState<FormState>(() => initForm(movimento));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -124,14 +258,29 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
       setNuovoMetodoInput('');
       syncCategorie();
       syncMetodi();
-      syncDettagli();
+      syncDettagliPerFrequenza();
       setTimeout(() => firstFocusRef.current?.focus(), 50);
     }
-  }, [open, movimento, syncCategorie, syncMetodi, syncDettagli]);
+  }, [open, movimento, syncCategorie, syncMetodi, syncDettagliPerFrequenza]);
 
-  function patch(k: keyof FormState, v: string) {
+  function patch(k: keyof Omit<FormState, 'dettaglio'>, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
     if (errors[k]) setErrors((e) => { const next = { ...e }; delete next[k]; return next; });
+  }
+
+  function setDettaglio(det: DettaglioFormState) {
+    setForm((f) => {
+      const next = { ...f, dettaglio: det };
+      if (det.mode === 'existing' && det.categoria_id != null) {
+        next.categoria_id = String(det.categoria_id);
+      } else if (det.mode === 'new' || (det.mode === 'existing' && det.categoria_id == null)) {
+        next.categoria_id = '';
+      }
+      return next;
+    });
+    setCategoriaOverride(false);
+    if (errors.dettaglio) setErrors((e) => { const next = { ...e }; delete next.dettaglio; return next; });
+    if (errors.categoria_id) setErrors((e) => { const next = { ...e }; delete next.categoria_id; return next; });
   }
 
   async function handleSave() {
@@ -139,19 +288,27 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
     try {
-      const payload = {
+      const basePayload = {
         data: form.data,
         importo: parseFloat(form.importo),
         tipo: form.tipo,
         descrizione: form.nota || null,
         categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
         metodo_id: form.metodo_id ? Number(form.metodo_id) : null,
-        dettaglio_id: form.dettaglio_id ? Number(form.dettaglio_id) : null,
+        dettaglio_id: form.dettaglio.mode === 'existing' ? form.dettaglio.id : null,
       };
+
+      const opts: SalvaMovimentoDettaglioOpts = {};
+      if (form.dettaglio.mode === 'new') {
+        opts.nuovoDettaglio = { nome: form.dettaglio.nome, categoria_id: Number(form.categoria_id) };
+      } else if (form.dettaglio.mode === 'existing' && form.dettaglio.categoria_id == null) {
+        opts.aggiornaCategoriaDettaglio = { id: form.dettaglio.id, categoria_id: Number(form.categoria_id) };
+      }
+
       if (mode === 'create') {
-        await create(payload);
+        await createConDettaglio(basePayload, opts);
       } else {
-        await update(movimento!.id, payload);
+        await updateConDettaglio(movimento!.id, basePayload, opts);
       }
       onClose();
     } catch (err) {
@@ -181,7 +338,6 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
     setAddingCategoria(true);
     try {
       await createCategoria(nome);
-      // Read fresh store state — closure `categorie` is stale after async update
       const created = useLookupStore.getState().categorie.find((c) => c.nome === nome);
       if (created) patch('categoria_id', String(created.id));
       setCreatingCategoria(false);
@@ -199,7 +355,6 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
     setAddingMetodo(true);
     try {
       await createMetodo(nome);
-      // Read fresh store state — closure `metodi` is stale after async update
       const created = useLookupStore.getState().metodi.find((m) => m.nome === nome);
       if (created) patch('metodo_id', String(created.id));
       setCreatingMetodo(false);
@@ -215,14 +370,22 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
 
   const title = mode === 'create' ? 'Nuovo movimento' : 'Modifica movimento';
 
+  const dettaglioHasCategoria =
+    form.dettaglio.mode === 'existing' && form.dettaglio.categoria_id != null;
+  const categoriaLocked = dettaglioHasCategoria && !categoriaOverride;
+  const categoriaRequired =
+    form.dettaglio.mode === 'new' ||
+    (form.dettaglio.mode === 'existing' && form.dettaglio.categoria_id == null);
+
+  const catNome = categoriaLocked
+    ? (categorie.find((c) => c.id === (form.dettaglio as { categoria_id: number }).categoria_id)?.nome ?? '—')
+    : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
 
-      {/* Panel */}
       <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card shadow-xl mx-4">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 id="dialog-title" className="text-sm font-semibold text-foreground">{title}</h2>
           <button onClick={onClose} aria-label="Chiudi" className={BTN_GHOST + ' p-1 border-0'}>
@@ -230,7 +393,6 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
           </button>
         </div>
 
-        {/* Form */}
         <div className="px-5 py-4 space-y-4">
           {/* Data */}
           <div>
@@ -251,7 +413,7 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="f-tipo" className={LABEL_CLS}>Tipo</label>
-              <select id="f-tipo" name="tipo" value={form.tipo} onChange={(e) => patch('tipo', e.target.value)} className={FIELD_CLS}>
+              <select id="f-tipo" name="tipo" value={form.tipo} onChange={(e) => patch('tipo', e.target.value as 'entrata' | 'uscita')} className={FIELD_CLS}>
                 <option value="uscita">Uscita</option>
                 <option value="entrata">Entrata</option>
               </select>
@@ -273,98 +435,82 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
             </div>
           </div>
 
-          {/* Dettaglio */}
+          {/* Dettaglio — combobox */}
           <div>
             <label htmlFor="f-dettaglio" className={LABEL_CLS}>
-              Dettaglio <span className="font-normal text-muted-foreground">(opzionale)</span>
+              Dettaglio <span className="text-red-500">*</span>
             </label>
-            <select
-              id="f-dettaglio"
-              name="dettaglio_id"
-              value={form.dettaglio_id}
-              onChange={(e) => {
-                const val = e.target.value;
-                const det = dettagli.find((d) => String(d.id) === val);
-                const hasCategoria = det?.categoria_id != null;
-                setForm((f) => ({
-                  ...f,
-                  dettaglio_id: val,
-                  ...(hasCategoria ? { categoria_id: String(det!.categoria_id) } : {}),
-                }));
-                if (errors.dettaglio_id) setErrors((e) => { const next = { ...e }; delete next.dettaglio_id; return next; });
-                if (hasCategoria) { setCreatingCategoria(false); setCategoriaOverride(false); }
-              }}
-              className={FIELD_CLS}
-            >
-              <option value="">— Nessuno —</option>
-              {dettagli.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
-            </select>
+            <DettaglioCombobox
+              dettagli={dettagliPerFrequenza}
+              value={form.dettaglio}
+              onChange={setDettaglio}
+              error={errors.dettaglio}
+              initialText={movimento?.dettaglio_nome ?? undefined}
+            />
           </div>
 
-          {/* Categoria — derivata dal dettaglio, modificabile solo su override esplicito */}
-          {(() => {
-            const selectedDet = dettagli.find((d) => String(d.id) === form.dettaglio_id);
-            const derivata = selectedDet?.categoria_id != null && !categoriaOverride;
-            const catNome = derivata
-              ? (categorie.find((c) => c.id === selectedDet!.categoria_id)?.nome ?? '—')
-              : null;
-            return (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="f-categoria" className={LABEL_CLS + ' mb-0'}>Categoria</label>
-                  {derivata && (
-                    <button
-                      type="button"
-                      onClick={() => setCategoriaOverride(true)}
-                      className="text-xs text-muted-foreground underline hover:text-foreground"
-                    >
-                      Modifica
-                    </button>
-                  )}
-                  {categoriaOverride && selectedDet?.categoria_id != null && (
-                    <button
-                      type="button"
-                      onClick={() => { setCategoriaOverride(false); patch('categoria_id', String(selectedDet.categoria_id)); }}
-                      className="text-xs text-muted-foreground underline hover:text-foreground"
-                    >
-                      Ripristina
-                    </button>
-                  )}
-                </div>
-                {derivata ? (
-                  <div className={FIELD_CLS + ' text-muted-foreground cursor-default'}>{catNome}</div>
-                ) : (
-                  <>
-                    <select
-                      id="f-categoria"
-                      name="categoria_id"
-                      value={creatingCategoria ? '__new__' : (form.categoria_id || '')}
-                      onChange={(e) => {
-                        if (e.target.value === '__new__') { setCreatingCategoria(true); }
-                        else { setCreatingCategoria(false); patch('categoria_id', e.target.value); }
-                      }}
-                      className={FIELD_CLS}
-                    >
-                      <option value="">— Nessuna —</option>
-                      {categorie.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                      <option value="__new__">+ Nuova categoria…</option>
-                    </select>
-                    {creatingCategoria && (
-                      <InlineCreator
-                        value={nuovaCategoriaInput}
-                        onChange={setNuovaCategoriaInput}
-                        onAdd={handleAddCategoria}
-                        onCancel={() => { setCreatingCategoria(false); setNuovaCategoriaInput(''); }}
-                        adding={addingCategoria}
-                        placeholder="Nome categoria"
-                        error={errors._nuovaCategoria}
-                      />
-                    )}
-                  </>
+          {/* Categoria */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="f-categoria" className={LABEL_CLS + ' mb-0'}>
+                Categoria{categoriaRequired && <span className="text-red-500 ml-0.5">*</span>}
+              </label>
+              {categoriaLocked && (
+                <button
+                  type="button"
+                  onClick={() => setCategoriaOverride(true)}
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Modifica
+                </button>
+              )}
+              {categoriaOverride && dettaglioHasCategoria && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoriaOverride(false);
+                    patch('categoria_id', String((form.dettaglio as { categoria_id: number }).categoria_id));
+                  }}
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Ripristina
+                </button>
+              )}
+            </div>
+
+            {categoriaLocked ? (
+              <div className={FIELD_CLS + ' text-muted-foreground cursor-default'}>{catNome}</div>
+            ) : (
+              <>
+                <select
+                  id="f-categoria"
+                  name="categoria_id"
+                  value={creatingCategoria ? '__new__' : (form.categoria_id || '')}
+                  onChange={(e) => {
+                    if (e.target.value === '__new__') { setCreatingCategoria(true); }
+                    else { setCreatingCategoria(false); patch('categoria_id', e.target.value); }
+                  }}
+                  className={FIELD_CLS}
+                >
+                  <option value="">{categoriaRequired ? '— Seleziona categoria —' : '— Nessuna —'}</option>
+                  {categorie.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  <option value="__new__">+ Nuova categoria…</option>
+                </select>
+                {creatingCategoria && (
+                  <InlineCreator
+                    value={nuovaCategoriaInput}
+                    onChange={setNuovaCategoriaInput}
+                    onAdd={handleAddCategoria}
+                    onCancel={() => { setCreatingCategoria(false); setNuovaCategoriaInput(''); }}
+                    adding={addingCategoria}
+                    placeholder="Nome categoria"
+                    error={errors._nuovaCategoria}
+                  />
                 )}
-              </div>
-            );
-          })()}
+              </>
+            )}
+            {errors.categoria_id && <p className={ERROR_CLS}>{errors.categoria_id}</p>}
+          </div>
 
           {/* Metodo */}
           <div>
@@ -417,7 +563,6 @@ export default function MovimentoDialog({ open, mode, movimento, onClose }: Prop
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <div>
             {mode === 'edit' && !confirmDelete && (

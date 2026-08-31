@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate } from './ipc/types';
+import type { Movimento, MovimentoFilters, MovimentoCreate, MovimentoUpdate, SalvaMovimentoDettaglioOpts } from './ipc/types';
 
 
 try {
@@ -23,6 +23,7 @@ try {
     },
     dettagli: {
       list: () => ipcRenderer.invoke('dettagli:list'),
+      listPerFrequenza: () => ipcRenderer.invoke('dettagli:list-per-frequenza'),
       create: (data: { nome: string; categoria_id?: number }) =>
         ipcRenderer.invoke('dettagli:create', data),
       update: (id: number, nome: string, categoria_id?: number) =>
@@ -41,6 +42,10 @@ try {
         ipcRenderer.invoke('movimenti:create', data),
       update: (id: number, data: MovimentoUpdate) =>
         ipcRenderer.invoke('movimenti:update', { id, ...data }),
+      createConDettaglio: (data: MovimentoCreate, opts: SalvaMovimentoDettaglioOpts) =>
+        ipcRenderer.invoke('movimenti:createConDettaglio', { data, opts }),
+      updateConDettaglio: (id: number, data: MovimentoUpdate, opts: SalvaMovimentoDettaglioOpts) =>
+        ipcRenderer.invoke('movimenti:updateConDettaglio', { id, data, opts }),
       delete: (id: number) =>
         ipcRenderer.invoke('movimenti:delete', { id }),
       restore: (movimento: Movimento) =>

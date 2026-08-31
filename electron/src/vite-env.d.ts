@@ -4,11 +4,13 @@ import type {
   Categoria,
   MetodoPagamento,
   Dettaglio,
+  DettaglioConFrequenza,
   Movimento,
   MovimentoWithLookup,
   MovimentoFilters,
   MovimentoCreate,
   MovimentoUpdate,
+  SalvaMovimentoDettaglioOpts,
   DashboardKPI,
   SerieMensile,
   BreakdownCategoria,
@@ -36,6 +38,7 @@ declare global {
       };
       dettagli: {
         list: () => Promise<Dettaglio[]>;
+        listPerFrequenza: () => Promise<DettaglioConFrequenza[]>;
         create: (data: { nome: string; categoria_id?: number }) => Promise<Dettaglio>;
         update: (id: number, nome: string, categoria_id?: number) => Promise<Dettaglio>;
         delete: (id: number, targetDettaglioId: number) => Promise<void>;
@@ -46,6 +49,8 @@ declare global {
         list: (filters?: MovimentoFilters) => Promise<MovimentoWithLookup[]>;
         create: (data: MovimentoCreate) => Promise<Movimento>;
         update: (id: number, data: MovimentoUpdate) => Promise<Movimento>;
+        createConDettaglio: (data: MovimentoCreate, opts: SalvaMovimentoDettaglioOpts) => Promise<Movimento>;
+        updateConDettaglio: (id: number, data: MovimentoUpdate, opts: SalvaMovimentoDettaglioOpts) => Promise<Movimento>;
         delete: (id: number) => Promise<void>;
         restore: (movimento: Movimento) => Promise<void>;
         deleteAll: (filters?: MovimentoFilters) => Promise<Movimento[]>;
