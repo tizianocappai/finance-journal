@@ -95,6 +95,35 @@ Unità temporale di aggregazione dei PatrimonioValori: mensile (12 periodi, genn
 **AnnoArchiviato**
 Anno in cui una PatrimonioVoce è stata archiviata. Marca il momento in cui la voce cessa di essere attiva; non cancella i dati storici.
 
+## Modulo Portfolio
+
+**Portfolio**
+Sezione separata dell'app (distinta da Patrimonio) che traccia le Posizioni finanziarie dell'utente. Mostra composizione per tipo, valore corrente e rendimento. I prezzi degli strumenti quotati sono live (tramite `yahoo-finance2`); non viene mantenuto storico prezzi in SQLite.
+
+**Posizione**
+Unità elementare del modulo Portfolio. Rappresenta uno strumento finanziario detenuto dall'utente. Ha: nome, tipo (uno dei sei tipi fissi), quantità, prezzo medio di carico, e opzionalmente ticker (per strumenti quotati) e data di acquisto (per il calcolo del CAGR). Una Posizione è attiva o archiviata.
+
+**Tipo Posizione**
+Classificazione fissa di una Posizione: Azioni · ETF · Obbligazioni · Crypto · Immobili · Altro. Determina il raggruppamento nella tabella del Portfolio.
+
+**Posizione Quotata**
+Posizione con un ticker valido su Yahoo Finance. Il prezzo corrente viene scaricato live all'apertura della schermata Portfolio. Non ha un campo "prezzo corrente manuale".
+
+**Posizione Non Quotata**
+Posizione senza ticker (es. immobile, crypto su exchange privato). Il prezzo corrente è un campo aggiornabile manualmente dall'utente.
+
+**Prezzo Medio di Carico**
+Costo medio ponderato per quota di una Posizione, inserito manualmente dall'utente. Usato come base per il calcolo del rendimento assoluto e del CAGR.
+
+**Rendimento Assoluto**
+Differenza tra valore corrente e valore investito di una Posizione: `(prezzo_corrente − prezzo_medio_carico) × quantità`. Espresso in valuta e in percentuale.
+
+**CAGR (Posizione)**
+Tasso annuo composto di crescita di una Posizione. Calcolato solo se la data di acquisto è presente. Basato su rendimento assoluto e anni trascorsi dalla data di acquisto.
+
+**Posizione Archiviata**
+Posizione che l'utente ha chiuso (es. vendita totale). Non contribuisce ai totali del Portfolio ed è nascosta per default (visibile con toggle). Mantiene il rendimento finale al momento dell'archiviazione.
+
 ## Regole di dominio
 
 - L'importo di un Movimento è sempre un numero positivo. Il Tipo (Entrata/Uscita) ne determina il segno ai fini del calcolo del Saldo.
