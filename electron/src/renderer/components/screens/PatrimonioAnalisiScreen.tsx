@@ -49,7 +49,7 @@ function NettoLineChart({ anno, granularita, voci, valori }: NettoLineChartProps
   const periodi = mesiForGranularita(granularita);
 
   const data = useMemo(() => {
-    return periodi.map(({ label, mese }) => {
+    const raw = periodi.map(({ label, mese }) => {
       let attivi = 0;
       let passivi = 0;
       for (const voce of voci) {
@@ -58,6 +58,14 @@ function NettoLineChart({ anno, granularita, voci, valori }: NettoLineChartProps
         else passivi += imp;
       }
       return { periodo: label, patrimonioNetto: attivi - passivi };
+    });
+    return raw.map((d, i) => {
+      const prev = raw[i - 1]?.patrimonioNetto;
+      const variazione =
+        prev != null && prev !== 0
+          ? ((d.patrimonioNetto - prev) / Math.abs(prev)) * 100
+          : null;
+      return { ...d, variazione };
     });
   }, [periodi, voci, valori, anno]);
 
@@ -73,8 +81,14 @@ function NettoLineChart({ anno, granularita, voci, valori }: NettoLineChartProps
         yKey: 'patrimonioNetto',
         yName: 'Patrimonio Netto',
         tooltip: {
-          renderer: (params: any) =>
-            `${params.datum.periodo}: ${formatEur(params.datum.patrimonioNetto)}`,
+          renderer: (params: any) => {
+            const { periodo, patrimonioNetto, variazione } = params.datum;
+            const value = `${periodo}: ${formatEur(patrimonioNetto)}`;
+            if (variazione == null) return value;
+            const sign = variazione >= 0 ? '+' : '';
+            const color = variazione >= 0 ? '#16a34a' : '#dc2626';
+            return `${value}<br/><span style="color:${color}">${sign}${variazione.toFixed(1)}% vs prec.</span>`;
+          },
         },
       },
     ],
@@ -182,7 +196,10 @@ function buildDonutData(
   granularita: 'mese' | 'quarter',
 ): DonutEntry[] {
   const periodi = mesiForGranularita(granularita);
-  const lastMese = periodi[periodi.length - 1].mese;
+  const lastPeriodoWithData = [...periodi]
+    .reverse()
+    .find(({ mese }) => valori.some((v) => v.anno === anno && v.mese === mese));
+  const lastMese = lastPeriodoWithData?.mese ?? periodi[periodi.length - 1].mese;
 
   const vociTipo = voci.filter((v) => v.tipo === tipo && v.attiva === 1);
   const byGruppo = new Map<string, number>();
