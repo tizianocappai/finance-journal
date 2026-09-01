@@ -27,23 +27,33 @@ describe('getStorico', () => {
     expect(storico.map((s) => s.anno)).toEqual([2023, 2024]);
   });
 
-  it('usa esclusivamente mese = 12 per aggregare', () => {
+  it('usa l\'ultimo mese disponibile per voce per anno', () => {
     const v = createVoce(db, 'Conto', 'attivo');
     upsertValore(db, v.id, 2024, 1, 1000);
     upsertValore(db, v.id, 2024, 6, 2000);
-    upsertValore(db, v.id, 2024, 12, 9000);
+    upsertValore(db, v.id, 2024, 9, 9000);
     const storico = getStorico(db);
     const entry2024 = storico.find((s) => s.anno === 2024);
     expect(entry2024?.totaleAttivi).toBe(9000);
   });
 
-  it('voci senza valore a dicembre contribuiscono 0 a quell\'anno', () => {
+  it('voce senza dicembre usa l\'ultimo mese disponibile', () => {
     const v = createVoce(db, 'Conto', 'attivo');
     upsertValore(db, v.id, 2024, 6, 5000);
     const storico = getStorico(db);
     const entry2024 = storico.find((s) => s.anno === 2024);
     expect(entry2024).toBeDefined();
-    expect(entry2024?.totaleAttivi).toBe(0);
+    expect(entry2024?.totaleAttivi).toBe(5000);
+  });
+
+  it('anno corrente con dati parziali mostra il dato reale', () => {
+    const v = createVoce(db, 'Conto', 'attivo');
+    upsertValore(db, v.id, 2026, 1, 1000);
+    upsertValore(db, v.id, 2026, 9, 3000);
+    const storico = getStorico(db);
+    const entry = storico.find((s) => s.anno === 2026);
+    expect(entry).toBeDefined();
+    expect(entry?.totaleAttivi).toBe(3000);
   });
 
   it('separa correttamente attivi e passivi', () => {

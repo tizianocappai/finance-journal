@@ -328,8 +328,14 @@ export function getStorico(db: Database.Database): PatrimonioStorico {
       .prepare(
         `SELECT pv.anno, pvc.tipo, SUM(pv.importo) as totale
          FROM patrimonio_valori pv
+         INNER JOIN (
+           SELECT voce_id, anno, MAX(mese) AS last_mese
+           FROM patrimonio_valori
+           GROUP BY voce_id, anno
+         ) latest ON pv.voce_id = latest.voce_id
+                  AND pv.anno = latest.anno
+                  AND pv.mese = latest.last_mese
          JOIN patrimonio_voci pvc ON pvc.id = pv.voce_id
-         WHERE pv.mese = 12
          GROUP BY pv.anno, pvc.tipo
          ORDER BY pv.anno`,
       )
